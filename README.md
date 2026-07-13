@@ -115,9 +115,7 @@ and returns a risk score and a boolean flag.
 
 ---
 
-## Scraping data yourself (optional)
-
-If you want to regenerate the dataset rather than use the Kaggle/scraped copies:
+## Fetching skins yourself (optional)
 
 ### Skins by UUID (Mojang API, rate-limited)
 
@@ -125,17 +123,6 @@ See `02_DataUnderstanding/Mining/SkinsFromUuid/minecraft_skin_downloader.py`. Bu
 resumable CSV manifest with `(uuid, skin_url, image_path, label)` and idempotently downloads
 images by file existence. Useful for fetching a single player's skin at deployment time;
 **not** practical for bulk collection due to Mojang rate limits.
-
-### Skins by keyword (Cloudflare-aware)
-
-See `02_DataUnderstanding/Mining/SkinsByKeyword/minecraft_keyword_scraper.py`. Uses
-`cloudscraper` for the search page and downloads PNGs via the direct
-`/skin/download/<id>` endpoint. Easily retargets to other keywords:
-
-```python
-from minecraft_keyword_scraper import run
-paths = run(keyword="military", target_count=1000)
-```
 
 ---
 
