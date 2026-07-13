@@ -1,0 +1,19 @@
+pandas
+requests
+beautifulsoup4
+cloudscraper
+tensorflow
+matplotlib
+numpy
+scikit-learn
+pandas
+seaborn
+opencv-python
+# ipympl interactive
+
+# for deployment
+fastapi
+uvicorn
+python-multipart
+pydantic
+rich
