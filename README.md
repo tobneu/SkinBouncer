@@ -1,5 +1,7 @@
 # SkinBouncer
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 > A binary image classifier that flags Minecraft player skins likely to violate server rules,
 > exposed as a REST API a server-side plugin can call on player-join. Built as a CRISP-DM
 > end-to-end machine-learning project for the FH ML course.
