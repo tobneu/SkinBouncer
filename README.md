@@ -86,6 +86,20 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
+### Sample data (optional, for a quick trial run)
+
+The scraper that built the original training set isn't part of this repo (see below). If
+you just want to see the pipeline run without supplying your own skins, generate a small
+local sample dataset (real skins fetched live from the public Mojang API, plus a
+synthetic demo "flagged" category — not committed to the repo, regenerate anytime):
+
+```powershell
+python scripts/generate_sample_data.py
+```
+
+This creates `sample_data/good/` and `sample_data/bad_demo/` (50 images each). See the
+script's docstring for provenance details.
+
 ### Reproduce the experiments
 
 1. Make sure the dataset is present under `data/skins/good_cleaned/` and
