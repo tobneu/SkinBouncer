@@ -77,10 +77,13 @@ Full metrics, ROC and PR curves, and the deployment recommendation are in
 
 ### Requirements
 
-Python 3.10+ (we developed on 3.11), with the packages listed in `requirements.txt`:
+Python 3.10+ (we developed on 3.11), with the packages listed in `requirements.txt`, plus
+the shared `skinbouncer_core` package (installed in editable mode so notebooks, the API,
+and the labeling tool all import the same code):
 
 ```powershell
 pip install -r requirements.txt
+pip install -e .
 ```
 
 ### Reproduce the experiments
