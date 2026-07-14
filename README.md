@@ -97,7 +97,8 @@ synthetic demo "flagged" category — not committed to the repo, regenerate anyt
 python scripts/generate_sample_data.py
 ```
 
-This creates `sample_data/good/` and `sample_data/bad_demo/` (50 images each). See the
+This creates `sample_data/good/` and `sample_data/bad_demo/` (150 images each - confirmed
+by experiment to be enough for the CNN to actually generalize, not just run). See the
 script's docstring for provenance details.
 
 ### Reproduce the experiments
