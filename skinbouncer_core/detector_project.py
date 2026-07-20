@@ -107,9 +107,12 @@ def setup_detector_project(good_dir, bad_dir, project_dir, ratios=DEFAULT_RATIOS
     new_good = [n for n in _list_images(good_dir) if f"good/{n}" not in images]
     new_bad = [n for n in _list_images(bad_dir) if f"bad/{n}" not in images]
 
-    for name, split in _stratified_assign(new_good, ratios, seed, is_first_run).items():
+    good_assignments = _stratified_assign(new_good, ratios, seed, is_first_run)
+    bad_assignments = _stratified_assign(new_bad, ratios, seed + 1, is_first_run)
+
+    for name, split in good_assignments.items():
         images[f"good/{name}"] = {"class": "good", "split": split}
-    for name, split in _stratified_assign(new_bad, ratios, seed + 1, is_first_run).items():
+    for name, split in bad_assignments.items():
         images[f"bad/{name}"] = {"class": "bad", "split": split}
 
     path.write_text(json.dumps(manifest, indent=2))
