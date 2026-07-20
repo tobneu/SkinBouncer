@@ -87,6 +87,7 @@ models/
 data/playerdata/
 data/skins/
 sample_data/
+detector_projects/
 
 # If you want to keep empty folders in git, add .gitkeep files there.
 /06_Deployment/api/data/
