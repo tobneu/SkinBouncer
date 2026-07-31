@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>SkinBouncer Labeling Tool</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <span class="logo">🛡️ SkinBouncer</span>
+    <span class="subtitle">Labeling Tool</span>
+  </header>
+
+  <main class="stage">
+    <div class="card">
+      <div class="progress">
+        <span id="progress-text">Loading…</span>
+        <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+      </div>
+
+      <div class="image-frame">
+        <img id="skin-image" alt="current skin" />
+        <div id="done-message" class="done-message hidden">
+          <div class="done-emoji">🎉</div>
+          <div>All images reviewed!</div>
+        </div>
+      </div>
+
+      <div id="filename" class="filename"></div>
+
+      <div class="actions">
+        <button class="btn btn-bad" onclick="decide('bad')">
+          ✕ Bad <span class="key">B</span>
+        </button>
+        <button class="btn btn-skip" onclick="decide('skip')">
+          ↷ Skip <span class="key">Space</span>
+        </button>
+        <button class="btn btn-good" onclick="decide('good')">
+          ✓ Good <span class="key">G</span>
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
