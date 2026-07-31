@@ -20,4 +20,4 @@ def main(folder, good_subdir="good", bad_subdir="bad", skip_subdir="skip"):
         width=900,
         height=700,
     )
-    webview.start(debug=os.environ.get("SKINBOUNCER_DEBUG") == "1")
+    webview.start(gui="qt", debug=os.environ.get("SKINBOUNCER_DEBUG") == "1")
