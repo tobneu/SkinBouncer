@@ -23,7 +23,12 @@ dependencies = [
     "python-multipart==0.0.32",
     "pydantic==2.10.6",
     "rich==15.0.0",
+    # for the labeling tool
+    "pywebview[qt]==6.2.1",
 ]
 
+[project.optional-dependencies]
+dev = ["pytest==8.4.2"]
+
 [tool.setuptools]
-packages = ["skinbouncer_core"]
+packages = ["skinbouncer_core", "labeling_tool"]

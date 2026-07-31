@@ -118,6 +118,23 @@ split) are left untouched, and only images newly added to `good_dir`/`bad_dir` s
 last run get assigned - to train/val only, so the frozen test set never grows or changes.
 See `skinbouncer_core/detector_project.py` for the manifest schema and full behavior.
 
+### Labeling tool (pywebview app)
+
+A native desktop app for manually triaging a folder of images into `good`/`bad`/`skip`
+by hand - the foundation the active-learning review queue builds on. No model/ML
+integration yet; it just walks a folder one image at a time and moves each file into
+the right subfolder as you decide, so the output is immediately usable as `--good`/
+`--bad` input to `setup_detector_project.py` above.
+
+```powershell
+python scripts/run_labeling_tool.py --folder sample_data/bad_demo
+```
+
+Opens a window with one image at a time; use the on-screen buttons or the keyboard
+shortcuts (G/→ good, B/← bad, Space/S skip). Quitting partway through and re-running
+the same command resumes with only the not-yet-reviewed images left. See
+`labeling_tool/review_session.py` for the persistence behavior.
+
 ### Reproduce the experiments
 
 1. Make sure the dataset is present under `data/skins/good_cleaned/` and
