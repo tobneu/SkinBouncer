@@ -101,6 +101,23 @@ This creates `sample_data/good/` and `sample_data/bad_demo/` (150 images each - 
 by experiment to be enough for the CNN to actually generalize, not just run). See the
 script's docstring for provenance details.
 
+### Detector project setup (stratified split)
+
+Given a `good/` folder and a `bad/<category>/` folder, set up a detector project - a
+stratified 70/15/15 train/val/test split, written to a manifest that later slices
+(training, review queue, export) rely on:
+
+```powershell
+python scripts/setup_detector_project.py --good sample_data/good \
+    --bad sample_data/bad_demo --project-dir detector_projects/bad_demo
+```
+
+This writes `detector_projects/bad_demo/split_manifest.json` and prints a per-split image
+count. Re-running the same command is safe: existing assignments (including the test
+split) are left untouched, and only images newly added to `good_dir`/`bad_dir` since the
+last run get assigned - to train/val only, so the frozen test set never grows or changes.
+See `skinbouncer_core/detector_project.py` for the manifest schema and full behavior.
+
 ### Reproduce the experiments
 
 1. Make sure the dataset is present under `data/skins/good_cleaned/` and
