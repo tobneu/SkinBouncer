@@ -4,7 +4,11 @@ const progressTextEl = document.getElementById("progress-text");
 const progressFillEl = document.getElementById("progress-fill");
 const doneMessageEl = document.getElementById("done-message");
 
+let currentState = null;
+let busy = false;
+
 function render(state) {
+  currentState = state;
   progressTextEl.textContent = state.done
     ? `Done — reviewed ${state.total} / ${state.total}`
     : `Reviewing ${state.index + 1} / ${state.total}`;
@@ -23,7 +27,16 @@ function render(state) {
 }
 
 function decide(action) {
-  window.pywebview.api.decide(action).then(render);
+  // Guard against keyboard auto-repeat / double-clicks firing a second
+  // decide() before the first one's response has updated currentState.done.
+  if (busy || (currentState && currentState.done)) {
+    return;
+  }
+  busy = true;
+  window.pywebview.api.decide(action).then((state) => {
+    busy = false;
+    render(state);
+  });
 }
 
 const KEY_TO_ACTION = {

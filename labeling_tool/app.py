@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import webview
@@ -19,4 +20,4 @@ def main(folder, good_subdir="good", bad_subdir="bad", skip_subdir="skip"):
         width=900,
         height=700,
     )
-    webview.start(debug=True)
+    webview.start(debug=os.environ.get("SKINBOUNCER_DEBUG") == "1")

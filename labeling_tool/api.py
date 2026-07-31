@@ -32,5 +32,6 @@ class LabelingAPI:
         }
 
     def decide(self, action):
-        self._session.decide(action)
+        if not self._session.is_done():
+            self._session.decide(action)
         return self.get_state()
