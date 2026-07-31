@@ -17,7 +17,7 @@ def main(folder, good_subdir="good", bad_subdir="bad", skip_subdir="skip"):
         "SkinBouncer Labeling Tool",
         url=str(WEB_DIR / "index.html"),
         js_api=api,
-        width=900,
-        height=700,
+        width=1280,
+        height=720,
     )
     webview.start(gui="qt", debug=os.environ.get("SKINBOUNCER_DEBUG") == "1")

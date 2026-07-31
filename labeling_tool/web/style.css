@@ -1,13 +1,28 @@
 :root {
-  --bg: #14161f;
-  --panel: #1d2030;
-  --panel-border: #2c3047;
-  --text: #eef0f8;
-  --muted: #8b8fa8;
-  --good: #3ddc84;
-  --bad: #ff5470;
-  --skip: #ffcc66;
-  --accent: #7c5cff;
+  --bg: #f2f3f5;
+  --panel: #ffffff;
+  --panel-border: #e4e6eb;
+  --text: #16181d;
+  --muted: #6b7280;
+  --frame-bg: #eceef1;
+  --neutral-btn: #eceef1;
+  --neutral-btn-hover: #e2e4e9;
+  --good: #22c55e;
+  --bad: #ef4444;
+  --accent: #14b8a6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --panel-border: #2b2f38;
+    --text: #f5f6f8;
+    --muted: #9099a8;
+    --frame-bg: #14161b;
+    --neutral-btn: #2b2f38;
+    --neutral-btn-hover: #363b46;
+  }
 }
 
 * {
@@ -20,7 +35,7 @@ html, body {
 }
 
 body {
-  background: radial-gradient(circle at 50% 0%, #232742 0%, var(--bg) 55%);
+  background: var(--bg);
   color: var(--text);
   font-family: "Segoe UI", "Inter", system-ui, sans-serif;
   display: flex;
@@ -29,7 +44,7 @@ body {
 }
 
 .topbar {
-  padding: 18px 28px;
+  padding: 20px 32px;
   display: flex;
   align-items: baseline;
   gap: 10px;
@@ -59,14 +74,14 @@ body {
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: 20px;
-  padding: 28px 36px 32px;
-  width: 420px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  padding: 36px 44px 40px;
+  width: 480px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
   text-align: center;
 }
 
 .progress {
-  margin-bottom: 18px;
+  margin-bottom: 20px;
 }
 
 #progress-text {
@@ -78,7 +93,7 @@ body {
   margin-top: 8px;
   height: 6px;
   border-radius: 3px;
-  background: #2a2e44;
+  background: var(--neutral-btn);
   overflow: hidden;
 }
 
@@ -91,10 +106,10 @@ body {
 
 .image-frame {
   position: relative;
-  width: 256px;
-  height: 256px;
-  margin: 0 auto 14px;
-  background: #0f111a;
+  width: 300px;
+  height: 300px;
+  margin: 0 auto 16px;
+  background: var(--frame-bg);
   border: 1px solid var(--panel-border);
   border-radius: 14px;
   display: flex;
@@ -104,8 +119,9 @@ body {
 }
 
 #skin-image {
-  width: 224px;
-  height: 224px;
+  width: 260px;
+  height: 260px;
+  object-fit: contain;
   image-rendering: pixelated;
 }
 
@@ -132,7 +148,7 @@ body {
 .filename {
   color: var(--muted);
   font-size: 13px;
-  margin-bottom: 22px;
+  margin-bottom: 24px;
   min-height: 16px;
   word-break: break-all;
 }
@@ -145,46 +161,56 @@ body {
 
 .btn {
   flex: 1;
-  border: none;
+  border: 2px solid transparent;
   border-radius: 12px;
   padding: 14px 10px;
   font-size: 15px;
   font-weight: 700;
-  color: #0c0d14;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  transition: transform 0.08s ease, filter 0.08s ease;
+  transition: filter 0.08s ease, transform 0.08s ease, border-color 0.08s ease;
 }
 
 .btn:hover {
-  filter: brightness(1.08);
+  filter: brightness(1.06);
 }
 
 .btn:active {
   transform: scale(0.96);
 }
 
+.btn:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+
 .btn .key {
   font-size: 11px;
   font-weight: 600;
-  opacity: 0.65;
-  background: rgba(12, 13, 20, 0.18);
+  opacity: 0.75;
+  background: rgba(0, 0, 0, 0.12);
   padding: 1px 6px;
   border-radius: 6px;
 }
 
 .btn-good {
   background: var(--good);
+  color: #ffffff;
 }
 
 .btn-bad {
   background: var(--bad);
-  color: #1a0a10;
+  color: #ffffff;
 }
 
 .btn-skip {
-  background: var(--skip);
+  background: var(--neutral-btn);
+  color: var(--text);
+}
+
+.btn-skip:hover {
+  background: var(--neutral-btn-hover);
 }
