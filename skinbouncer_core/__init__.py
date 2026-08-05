@@ -4,6 +4,7 @@ from .architecture import build_cnn
 from .model_io import CUSTOM_OBJECTS, save_model, load_model
 from .threshold import find_threshold_for_recall
 from .detector_project import setup_detector_project, load_manifest, get_split_filepaths
+from .train import train_detector
 
 __all__ = [
     "IMG_SIZE",
@@ -20,4 +21,5 @@ __all__ = [
     "setup_detector_project",
     "load_manifest",
     "get_split_filepaths",
+    "train_detector",
 ]
