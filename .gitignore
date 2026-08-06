@@ -84,8 +84,7 @@ models/
 # ----------------------------
 # Generated data
 # ----------------------------
-data/playerdata/
-data/skins/
+data/
 sample_data/
 detector_projects/
 
