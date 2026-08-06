@@ -72,6 +72,19 @@ the real UI in the real engine, and `page().runJavaScript(...)` to read values b
 Point it at a copy of `labeling_tool/web/index.html` with a stub `window.pywebview.api`
 injected, and the whole app shell renders against whatever state you want to describe.
 
+`scripts/preview_web_ui.py` does exactly that:
+
+```bash
+# a screenshot of any screen, in either theme
+python scripts/preview_web_ui.py --screen active-learning --theme dark --out /tmp/ui.png
+
+# or an assertion - exits non-zero if the page logged anything to the console
+python scripts/preview_web_ui.py --screen blind --eval "window.__errors"
+```
+
+`--screen` picks which `js_api` state shape to mock (`labeling`, `blind`,
+`active-learning`, `done`), so the same run covers what each screen is meant to show.
+
 That's how `skin3d.js` was checked in: a generated skin texture with each of the six
 faces painted a different hue turns "does the model look right" into an assertion -
 sample a pixel, and the colour names which face the renderer chose. It caught three real
