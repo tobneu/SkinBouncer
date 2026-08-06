@@ -209,6 +209,24 @@ Then `POST http://localhost:8000/check/player/` with a JSON body of the form:
 The service downloads the current skin for the player from the Mojang API, runs inference,
 and returns a risk score and a boolean flag.
 
+### Docker deployment
+
+Build a standalone image of the API, baking in whatever detector folders currently
+exist under `06_Deployment/api/models/detectors/` (each a `<category>/model.keras` +
+`threshold.json` pair, e.g. produced by the labeling tool's export step). There's no
+runtime toggle - a detector is "enabled" simply by having been present when the image
+was built; remove its folder and rebuild to exclude it.
+
+```bash
+06_Deployment/build.sh                 # tags skinbouncer-api:latest
+06_Deployment/build.sh my-tag:v1        # or pick your own tag
+docker run --rm -p 8000:8000 skinbouncer-api:latest
+```
+
+`GET http://localhost:8000/` lists which detectors are loaded; `POST /check/player/`
+works exactly as above. Runnable from anywhere - the script resolves paths relative to
+itself, not your current directory.
+
 ---
 
 ## Fetching skins yourself (optional)
