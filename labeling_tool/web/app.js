@@ -33,6 +33,10 @@ function render(state) {
   // both the done and not-done states, so the button stays visible on the done screen.
   btnRetrainEl.classList.toggle("hidden", !state.can_retrain);
 
+  // can_skip is only set (to false) by BlindTestReviewAPI - both other APIs leave it
+  // undefined, so the button stays visible everywhere else.
+  btnSkipEl.classList.toggle("hidden", state.can_skip === false);
+
   if (state.done) {
     imageEl.classList.add("hidden");
     doneMessageEl.classList.remove("hidden");
@@ -46,13 +50,17 @@ function render(state) {
     imageEl.src = state.image_data_uri;
     filenameEl.textContent = state.filename;
 
-    // Only the active-learning queue's ActiveLearningAPI includes these fields -
-    // the plain labeling tool's LabelingAPI doesn't, so the row stays hidden there.
+    // recorded_class is set by both ActiveLearningAPI and BlindTestReviewAPI (not the
+    // plain labeling tool's LabelingAPI, so the row stays hidden there). reason and
+    // predicted_prob are reveal model output, so only ActiveLearningAPI sets them -
+    // BlindTestReviewAPI deliberately never does, per #10's "no model info" requirement.
     if ("recorded_class" in state) {
       metaRowEl.classList.remove("hidden");
       metaRecordedEl.textContent = `Currently: ${state.recorded_class}`;
-      metaReasonEl.textContent = state.reason;
-      metaProbEl.textContent = `p=${state.predicted_prob.toFixed(3)}`;
+      metaReasonEl.classList.toggle("hidden", !("reason" in state));
+      metaReasonEl.textContent = state.reason ?? "";
+      metaProbEl.classList.toggle("hidden", !("predicted_prob" in state));
+      metaProbEl.textContent = "predicted_prob" in state ? `p=${state.predicted_prob.toFixed(3)}` : "";
       btnGoodEl.classList.toggle("btn-current", state.recorded_class === "good");
       btnBadEl.classList.toggle("btn-current", state.recorded_class === "bad");
     } else {
@@ -120,10 +128,14 @@ const KEY_TO_ACTION = {
 
 document.addEventListener("keydown", (event) => {
   const action = KEY_TO_ACTION[event.key];
-  if (action) {
-    event.preventDefault();
-    decide(action);
+  if (!action) {
+    return;
   }
+  if (action === "skip" && currentState && currentState.can_skip === false) {
+    return;
+  }
+  event.preventDefault();
+  decide(action);
 });
 
 window.addEventListener("pywebviewready", () => {

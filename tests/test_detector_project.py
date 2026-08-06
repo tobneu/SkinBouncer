@@ -73,6 +73,19 @@ def test_relabel_image_refuses_to_touch_test_split(tmp_path):
         relabel_image(manifest, project_dir, "good/good0.png", "bad")
 
 
+def test_relabel_image_allows_test_split_when_allow_test_true(tmp_path):
+    project_dir, manifest = _make_project(tmp_path, ratios=(0.0, 0.0, 1.0))
+    good_dir = tmp_path / "good"
+    bad_dir = tmp_path / "bad_demo"
+
+    new_key = relabel_image(manifest, project_dir, "good/good0.png", "bad", allow_test=True)
+
+    assert new_key == "bad/good0.png"
+    assert manifest["images"][new_key] == {"class": "bad", "split": "test"}
+    assert not (good_dir / "good0.png").exists()
+    assert (bad_dir / "good0.png").exists()
+
+
 def test_relabel_image_refuses_unknown_key(tmp_path):
     project_dir, manifest = _make_project(tmp_path)
     with pytest.raises(KeyError):
