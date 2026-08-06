@@ -2,8 +2,12 @@
 prediction diverges from each image's recorded class, and walks them in that order -
 the active-learning counterpart to review_session.ReviewSession's plain folder walk.
 
-The frozen test split is never loaded, scored, or shown here - see
-skinbouncer_core.detector_project's module docstring on why test must stay untouched.
+The frozen test split is never loaded into the ranked review queue, and this session
+never relabels or otherwise mutates it - see skinbouncer_core.detector_project's module
+docstring on why test must stay untouched by that loop. It is, separately, read-only
+scored via skinbouncer_core.evaluate_confusion_matrix purely to report held-out test
+performance to the UI; that scoring never feeds _build_ranked_items or relabel_image,
+so it doesn't reintroduce test data into the review flow.
 
 Ranking: a single continuous "suspicion" score subsumes both signals the issue asks
 for (near-threshold uncertainty and confident disagreement) as different magnitudes of
@@ -35,9 +39,12 @@ checkpoint is" framing as a per-launch guarantee, not a per-decision one.
 """
 
 import json
+import threading
 from pathlib import Path
 
 from skinbouncer_core import (
+    compare_runs,
+    evaluate_confusion_matrix,
     get_split_filepaths,
     load_images,
     load_manifest,
@@ -83,10 +90,14 @@ class ActiveLearningSession:
             )
         self.model = load_model(model_path)
         self.threshold = json.loads(threshold_path.read_text())["threshold"]
+        self.confusion_matrix = evaluate_confusion_matrix(self.manifest, self.model, self.threshold)
 
         self.items = self._build_ranked_items()
         self.index = 0
         self.relabel_count = 0
+        self.training_progress = {"status": "idle"}
+        self.run_comparison = None
+        self._retrain_thread = None
 
     def _build_ranked_items(self):
         entries = []  # (key, path, recorded_class)
@@ -155,10 +166,38 @@ class ActiveLearningSession:
         right now (including any relabels made so far this session), then re-rank the
         queue against the new checkpoint. lr/patience default lower than
         train_detector's own cold-start defaults - a warm-started model converges (or
-        plateaus) faster than one starting from random init."""
-        train_detector(self.project_dir, epochs=epochs, batch_size=batch_size,
-                        lr=lr, patience=patience, warm_start=True)
-        self.model = load_model(self.project_dir / "model.keras")
-        self.threshold = json.loads((self.project_dir / "threshold.json").read_text())["threshold"]
-        self.items = self._build_ranked_items()
-        self.index = 0
+        plateaus) faster than one starting from random init.
+
+        Runs on a background thread and returns immediately - training_progress is
+        updated live (polled by the UI via ActiveLearningAPI.get_training_progress())
+        rather than this call blocking until training finishes. This sidesteps relying
+        on pywebview servicing concurrent js_api calls: every call, including this one,
+        stays fast, so there's nothing that needs to overlap."""
+        if self.training_progress.get("status") == "running":
+            raise RuntimeError("a retrain is already in progress")
+
+        self.training_progress = {"status": "running", "epoch": 0, "epochs_total": epochs, "history": {}}
+
+        def on_epoch_end(epoch, logs):
+            self.training_progress["epoch"] = epoch + 1
+            history = self.training_progress["history"]
+            for k, v in logs.items():
+                history.setdefault(k, []).append(float(v))
+
+        def worker():
+            try:
+                train_detector(self.project_dir, epochs=epochs, batch_size=batch_size,
+                                lr=lr, patience=patience, warm_start=True, on_epoch_end=on_epoch_end)
+                self.model = load_model(self.project_dir / "model.keras")
+                self.threshold = json.loads((self.project_dir / "threshold.json").read_text())["threshold"]
+                self.items = self._build_ranked_items()
+                self.index = 0
+                self.run_comparison = compare_runs(self.project_dir, n=5)
+                self.confusion_matrix = evaluate_confusion_matrix(self.manifest, self.model, self.threshold)
+                self.training_progress["status"] = "done"
+            except Exception as e:
+                self.training_progress["status"] = "error"
+                self.training_progress["error"] = str(e)
+
+        self._retrain_thread = threading.Thread(target=worker, daemon=True)
+        self._retrain_thread.start()

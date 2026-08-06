@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from skinbouncer_core import setup_detector_project, train_detector
+from skinbouncer_core import evaluate_confusion_matrix, setup_detector_project, train_detector
 from labeling_tool.active_learning_session import ActiveLearningSession, _reason, _suspicion
 
 
@@ -81,6 +81,15 @@ def test_session_items_have_expected_shape(tmp_path):
     assert set(item) == {"key", "path", "recorded_class", "prob", "suspicion", "reason"}
     assert item["recorded_class"] in ("good", "bad")
     assert 0.0 <= item["prob"] <= 1.0
+
+
+def test_session_has_confusion_matrix_after_init(tmp_path):
+    project_dir = _make_trained_project(tmp_path)
+    session = ActiveLearningSession(project_dir)
+
+    assert session.confusion_matrix is not None
+    assert set(session.confusion_matrix) == {"tp", "tn", "fp", "fn", "n"}
+    assert session.confusion_matrix["n"] > 0
 
 
 def test_session_raises_clear_error_if_not_a_project_dir(tmp_path):
@@ -161,11 +170,79 @@ def test_retrain_rebuilds_items_and_resets_index(tmp_path):
     old_model_path_mtime = (project_dir / "model.keras").stat().st_mtime
 
     session.retrain(epochs=1, batch_size=8)
+    session._retrain_thread.join()
 
     assert session.index == 0
     assert len(session.items) > 0
     assert session.relabel_count == relabel_count_before
     assert (project_dir / "model.keras").stat().st_mtime >= old_model_path_mtime
+
+
+def test_retrain_runs_in_background_and_reports_progress(tmp_path):
+    project_dir = _make_trained_project(tmp_path)
+    session = ActiveLearningSession(project_dir)
+    assert session.training_progress == {"status": "idle"}
+
+    session.retrain(epochs=1, batch_size=8)
+    session._retrain_thread.join()
+
+    assert session.training_progress["status"] == "done"
+    assert session.training_progress["epoch"] == 1
+    assert session.training_progress["epochs_total"] == 1
+    assert set(session.training_progress["history"]) >= {"auc", "val_auc"}
+    assert len(session.training_progress["history"]["auc"]) == 1
+
+
+def test_retrain_populates_run_comparison_against_previous_round(tmp_path):
+    project_dir = _make_trained_project(tmp_path)  # already one training_runs.json entry
+    session = ActiveLearningSession(project_dir)
+    assert session.run_comparison is None
+
+    session.retrain(epochs=1, batch_size=8)
+    session._retrain_thread.join()
+
+    assert session.run_comparison is not None
+    assert "current" in session.run_comparison
+    assert len(session.run_comparison["previous"]) == 1
+
+
+def test_retrain_recomputes_confusion_matrix(tmp_path):
+    project_dir = _make_trained_project(tmp_path)
+    session = ActiveLearningSession(project_dir)
+
+    session.retrain(epochs=1, batch_size=8)
+    session._retrain_thread.join()
+
+    assert session.confusion_matrix == evaluate_confusion_matrix(
+        session.manifest, session.model, session.threshold
+    )
+
+
+def test_retrain_refuses_when_already_running(tmp_path):
+    project_dir = _make_trained_project(tmp_path)
+    session = ActiveLearningSession(project_dir)
+    session.training_progress = {"status": "running"}
+
+    with pytest.raises(RuntimeError, match="already in progress"):
+        session.retrain(epochs=1, batch_size=8)
+
+
+def test_retrain_error_path_sets_status_and_does_not_crash(tmp_path, monkeypatch):
+    project_dir = _make_trained_project(tmp_path)
+    session = ActiveLearningSession(project_dir)
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("simulated training failure")
+
+    monkeypatch.setattr("labeling_tool.active_learning_session.train_detector", _boom)
+
+    session.retrain(epochs=1, batch_size=8)
+    session._retrain_thread.join()
+
+    assert session.training_progress["status"] == "error"
+    assert session.training_progress["error"] == "simulated training failure"
+    # session itself is still usable - unaffected by the failed retrain
+    assert session.current_item() is not None
 
 
 def test_decide_relabel_collision_leaves_session_unchanged(tmp_path):

@@ -10,6 +10,10 @@
   --good: #22c55e;
   --bad: #ef4444;
   --accent: #14b8a6;
+  --series-train: #f59e0b;
+  --series-val: #14b8a6;
+  --good-tint: rgba(34, 197, 94, 0.14);
+  --bad-tint: rgba(239, 68, 68, 0.14);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -22,6 +26,8 @@
     --frame-bg: #14161b;
     --neutral-btn: #2b2f38;
     --neutral-btn-hover: #363b46;
+    --good-tint: rgba(34, 197, 94, 0.22);
+    --bad-tint: rgba(239, 68, 68, 0.22);
   }
 }
 
@@ -259,6 +265,188 @@ body {
 
 .btn-retrain:hover {
   background: var(--neutral-btn-hover);
+}
+
+.training-progress {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: var(--frame-bg);
+}
+
+.training-epoch-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.swatch-train {
+  background: var(--series-train);
+}
+
+.swatch-val {
+  background: var(--series-val);
+}
+
+#training-chart {
+  display: block;
+  width: 100%;
+  height: 150px;
+}
+
+.run-comparison {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--neutral-btn);
+  text-align: left;
+}
+
+.run-comparison-headline {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.run-comparison-note {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.run-comparison-track {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 110px;
+}
+
+.run-comparison-bar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+}
+
+.run-comparison-value {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 4px;
+}
+
+.run-comparison-fill {
+  width: 100%;
+  min-height: 4px;
+  border-radius: 6px 6px 0 0;
+  background: var(--panel-border);
+}
+
+.run-comparison-fill.current {
+  background: var(--accent);
+}
+
+.run-comparison-label {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 6px;
+  text-align: center;
+}
+
+.run-comparison-delta {
+  font-size: 10px;
+  margin-top: 2px;
+  font-weight: 600;
+}
+
+.run-comparison-delta.up {
+  color: var(--good);
+}
+
+.run-comparison-delta.down {
+  color: var(--bad);
+}
+
+.confusion-matrix {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--neutral-btn);
+  text-align: left;
+}
+
+.confusion-matrix-headline {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.confusion-matrix-grid {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  gap: 4px;
+  align-items: center;
+}
+
+.cm-axis-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: center;
+  padding: 0 4px;
+}
+
+.confusion-matrix-cell {
+  border-radius: 8px;
+  padding: 10px 6px;
+  text-align: center;
+}
+
+.confusion-matrix-cell.correct {
+  background: var(--good-tint);
+}
+
+.confusion-matrix-cell.incorrect {
+  background: var(--bad-tint);
+}
+
+.confusion-matrix-cell .count {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.confusion-matrix-cell .pct {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.confusion-matrix-caption {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 8px;
 }
 
 /* Marks whichever of Good/Bad matches the image's currently recorded class, in the

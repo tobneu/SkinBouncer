@@ -176,8 +176,12 @@ images. See `labeling_tool/active_learning_session.py` for the ranking formula.
 The Retrain button lets you fine-tune without leaving the app: it warm-starts from the
 current checkpoint (not a fresh random init) against whatever the manifest looks like
 right now, including any relabels made so far, then re-ranks the queue from the top
-against the new checkpoint. The UI disables input and shows "Training…" for the
-duration - label a batch, hit Retrain, repeat, for as many rounds as you want.
+against the new checkpoint. The UI disables input for the duration and shows a live
+epoch counter and a train/val AUC learning curve as training progresses, so you can see
+convergence (or a plateau) happening in real time. Once a round finishes, it shows the
+new val AUC alongside the percentage change against each of the last up to 5 previous
+rounds for that project, so it's clear whether that round actually helped - label a
+batch, hit Retrain, repeat, for as many rounds as you want.
 
 ### Blind test-set review
 
