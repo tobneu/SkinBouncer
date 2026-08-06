@@ -61,3 +61,16 @@ class ActiveLearningAPI(LabelingAPI):
     def retrain(self):
         self._session.retrain()
         return self.get_state()
+
+
+class BlindTestReviewAPI(LabelingAPI):
+    """Same js_api contract as LabelingAPI, but deliberately never exposes any
+    model-derived field (no predicted_prob/reason/can_retrain) - this mode shows no
+    model information at all, only the image's current recorded label."""
+
+    def get_state(self):
+        state = super().get_state()
+        state["can_skip"] = False
+        if not state["done"]:
+            state["recorded_class"] = self._session.current_item()["recorded_class"]
+        return state

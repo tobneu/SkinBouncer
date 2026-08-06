@@ -179,6 +179,23 @@ right now, including any relabels made so far, then re-ranks the queue from the 
 against the new checkpoint. The UI disables input and shows "Training…" for the
 duration - label a batch, hit Retrain, repeat, for as many rounds as you want.
 
+### Blind test-set review
+
+Same app shell again, but for curating the frozen test split instead of train/val: no
+model prediction, confidence, or ranking is shown anywhere, so the test set stays an
+independent ground truth for whatever export-gate metrics eventually consume it. No
+trained checkpoint is required - only a split manifest:
+
+```powershell
+python scripts/run_blind_test_review.py --project-dir detector_projects/bad_demo
+```
+
+Good/Bad mean the same confirm-or-correct thing as the active-learning queue (see
+above), applied to test-split images instead. There's no Skip in this mode - every
+image gets an explicit decision. Progress is written directly onto each test image's
+manifest entry (`"reviewed": true`), so quitting and relaunching resumes exactly where
+you left off instead of starting over - see `labeling_tool/blind_test_review_session.py`.
+
 ### Reproduce the experiments
 
 1. Make sure the dataset is present under `data/skins/good_cleaned/` and

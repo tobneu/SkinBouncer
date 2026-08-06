@@ -141,8 +141,13 @@ body {
   font-size: 42px;
 }
 
+/* !important: this utility class is applied alongside other classes (.btn, .meta-row,
+   ...) that set their own `display`. Without !important, equal-specificity cascade
+   order (not the .hidden toggle) would decide visibility - e.g. .btn's `display: flex`
+   sits later in this file than .hidden and would win, leaving "hidden" buttons visible
+   and clickable despite the class being set correctly. */
 .hidden {
-  display: none;
+  display: none !important;
 }
 
 .filename {
