@@ -152,6 +152,27 @@ shortcuts (G/→ good, B/← bad, Space/S skip). Quitting partway through and re
 the same command resumes with only the not-yet-reviewed images left. See
 `labeling_tool/review_session.py` for the persistence behavior.
 
+### Active-learning review queue
+
+Same app shell, but instead of a plain folder walk it ranks a trained detector
+project's train+val images by how much the current checkpoint's prediction diverges
+from each image's recorded label, and walks them in that order - so review effort goes
+where it matters most. Requires the project to already have a checkpoint (run
+`train_detector.py` above first):
+
+```powershell
+python scripts/run_active_learning_queue.py --project-dir detector_projects/bad_demo
+```
+
+Good/Bad now mean "confirm this should be labeled good/bad": pressing the button that
+matches the image's current label (highlighted) is a no-op confirmation, pressing the
+other one relabels it - moves the file between the project's `good_dir`/`bad_dir` and
+updates the manifest immediately (see `skinbouncer_core.detector_project.relabel_image`).
+Skip always just moves on without changing anything. The frozen test split is never
+loaded or shown. Each launch recomputes the full ranked queue fresh against whatever
+checkpoint currently exists - there's no cross-session memory of already-reviewed
+images. See `labeling_tool/active_learning_session.py` for the ranking formula.
+
 ### Reproduce the experiments
 
 1. Make sure the dataset is present under `data/skins/good_cleaned/` and

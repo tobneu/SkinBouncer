@@ -28,14 +28,20 @@
 
       <div id="filename" class="filename"></div>
 
+      <div id="meta-row" class="meta-row hidden">
+        <span id="meta-recorded" class="meta-badge"></span>
+        <span id="meta-reason" class="meta-badge"></span>
+        <span id="meta-prob" class="meta-prob"></span>
+      </div>
+
       <div class="actions">
-        <button class="btn btn-bad" onclick="decide('bad')">
+        <button id="btn-bad" class="btn btn-bad" onclick="decide('bad')">
           ✕ Bad <span class="key">B</span>
         </button>
         <button class="btn btn-skip" onclick="decide('skip')">
           ↷ Skip <span class="key">Space</span>
         </button>
-        <button class="btn btn-good" onclick="decide('good')">
+        <button id="btn-good" class="btn btn-good" onclick="decide('good')">
           ✓ Good <span class="key">G</span>
         </button>
       </div>
