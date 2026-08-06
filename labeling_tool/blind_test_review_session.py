@@ -1,13 +1,16 @@
-"""Walks the frozen test partition exactly once for manual confirm/correct, showing no
-model prediction or confidence anywhere - this is what keeps the test set an
-independent ground truth for the export-gate metrics it will later be used to compute.
+"""Walks the frozen test partition for manual confirm/correct, showing no model
+prediction or confidence anywhere - this is what keeps the test set an independent
+ground truth for the export-gate metrics it will later be used to compute. Each image
+is reviewed exactly once overall, but the walk itself is safe to pause and resume
+freely - quitting mid-session (or after any single decision) and relaunching later
+picks up right where it left off, with nothing to redo.
 
 Unlike ActiveLearningSession (which deliberately recomputes its ranked pool fresh on
 every launch, per #12's design), progress here must survive relaunches: a "reviewed"
-flag is written directly onto each test-split manifest entry, so total()/index reflect
-overall test-set completion rather than just this session's walk order. Relaunching
-shows real cumulative progress instead of resetting to 0, and already-reviewed images
-never reappear.
+flag is written directly onto each test-split manifest entry immediately after every
+decide() call, so total()/index reflect overall test-set completion rather than just
+this session's walk order. Relaunching shows real cumulative progress instead of
+resetting to 0, and already-reviewed images never reappear.
 
 No trained checkpoint is required - this mode never loads a model, so test-set
 curation can start as soon as a split manifest exists, independent of training.
