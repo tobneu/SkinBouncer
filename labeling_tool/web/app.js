@@ -21,12 +21,16 @@ const cmTnEl = document.getElementById("cm-tn");
 const cmFpEl = document.getElementById("cm-fp");
 const cmFnEl = document.getElementById("cm-fn");
 const cmTpEl = document.getElementById("cm-tp");
+const testRatesEl = document.getElementById("test-rates");
+const curationNoteEl = document.getElementById("curation-note");
+const btnExportEl = document.getElementById("btn-export");
+const exportResultEl = document.getElementById("export-result");
 
 let currentState = null;
 let busy = false;
 
 function setControlsDisabled(disabled) {
-  [btnGoodEl, btnBadEl, btnSkipEl, btnRetrainEl].forEach((btn) => {
+  [btnGoodEl, btnBadEl, btnSkipEl, btnRetrainEl, btnExportEl].forEach((btn) => {
     btn.disabled = disabled;
   });
 }
@@ -42,6 +46,7 @@ function render(state) {
   // LabelingAPI), and unlike recorded_class/reason/predicted_prob it's present in
   // both the done and not-done states, so the button stays visible on the done screen.
   btnRetrainEl.classList.toggle("hidden", !state.can_retrain);
+  btnExportEl.classList.toggle("hidden", !state.can_export);
 
   // can_skip is only set (to false) by BlindTestReviewAPI - both other APIs leave it
   // undefined, so the button stays visible everywhere else.
@@ -88,6 +93,10 @@ function render(state) {
   // (computed once a checkpoint exists), unlike run_comparison.
   if ("confusion_matrix" in state) {
     renderConfusionMatrix(state.confusion_matrix);
+  }
+
+  if ("test_curation" in state) {
+    renderCurationNote(state.test_curation);
   }
 }
 
@@ -161,7 +170,36 @@ function renderConfusionMatrix(cm) {
   const correctPct = Math.round((correct / cm.n) * 100);
   confusionMatrixHeadlineEl.textContent =
     `Correctly classified ${correctPct}% of test images (${correct} of ${cm.n})`;
+
+  // Recall and precision, phrased as what they mean for the operator's actual decision
+  // rather than by name. A rate is null when its denominator is empty (e.g. no bad
+  // images in the test split at all) - "n/a" is the honest answer there, not 0%.
+  testRatesEl.innerHTML = [
+    { label: "Catches bad skins", rate: cm.recall, hit: cm.tp, of: cm.tp + cm.fn },
+    { label: "When it flags, it's right", rate: cm.precision, hit: cm.tp, of: cm.tp + cm.fp },
+  ].map(({ label, rate, hit, of }) => {
+    const value = rate === null ? "n/a" : `${Math.round(rate * 100)}%`;
+    const detail = rate === null ? "" : `<span class="test-rate-detail">${hit} of ${of}</span>`;
+    return `<div class="test-rate"><span>${label}</span><span class="test-rate-value">${value}${detail}</span></div>`;
+  }).join("");
+
   confusionMatrixEl.classList.remove("hidden");
+}
+
+function renderCurationNote(curation) {
+  // Export is never blocked on curation - this only tells the operator how much the
+  // numbers above are worth, since an unreviewed test split is still scored against
+  // whatever labels the original bulk sort happened to produce.
+  if (!curation || curation.complete || curation.total === 0) {
+    curationNoteEl.classList.add("hidden");
+    return;
+  }
+  const left = curation.total - curation.reviewed;
+  curationNoteEl.textContent =
+    `⚠ ${left} of ${curation.total} test images haven't been double-checked yet. ` +
+    `Run the blind test review to confirm their labels - until then the numbers above ` +
+    `are only as accurate as the original sorting was.`;
+  curationNoteEl.classList.remove("hidden");
 }
 
 function renderTrainingProgress(progress) {
@@ -275,6 +313,8 @@ function retrain() {
   setControlsDisabled(true);
   btnRetrainEl.textContent = "Training…";
   runComparisonEl.classList.add("hidden");
+  // Stale the moment training starts - it names a checkpoint that's being replaced.
+  exportResultEl.classList.add("hidden");
   // Hidden for the duration so it never shows numbers from a checkpoint that's
   // mid-replacement - render(state) brings it back once the new one is scored.
   confusionMatrixEl.classList.add("hidden");
@@ -310,6 +350,37 @@ function onRetrainSettled() {
   setControlsDisabled(false);
   btnRetrainEl.textContent = "🔄 Retrain";
   trainingProgressEl.classList.add("hidden");
+}
+
+function exportDetector() {
+  if (busy) {
+    return;
+  }
+  busy = true;
+  setControlsDisabled(true);
+  btnExportEl.textContent = "Exporting…";
+  exportResultEl.classList.add("hidden");
+  window.pywebview.api
+    .export_detector()
+    .then((result) => {
+      exportResultEl.classList.remove("failed");
+      exportResultEl.textContent =
+        `✓ Exported "${result.category}" (threshold ${result.threshold.toFixed(3)}) to ${result.dest_dir}. ` +
+        `Rebuild the API image to ship it.`;
+      exportResultEl.classList.remove("hidden");
+    })
+    .catch((error) => {
+      // Shown inline rather than as an alert() - the failure is worth reading next to
+      // the metrics it belongs to, and an alert would have to be dismissed first.
+      exportResultEl.classList.add("failed");
+      exportResultEl.textContent = `✕ Export failed: ${error}`;
+      exportResultEl.classList.remove("hidden");
+    })
+    .finally(() => {
+      busy = false;
+      setControlsDisabled(false);
+      btnExportEl.textContent = "📦 Export detector";
+    });
 }
 
 const KEY_TO_ACTION = {

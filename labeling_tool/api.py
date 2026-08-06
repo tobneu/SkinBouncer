@@ -49,6 +49,10 @@ class ActiveLearningAPI(LabelingAPI):
         # whether to show the Retrain button even on the "done" screen, where
         # current_item() is None and the ranking-only fields aren't available.
         state["can_retrain"] = True
+        # Same unconditional treatment as can_retrain, for the same reason: exporting
+        # stays available on the "done" screen, which is where an operator who just
+        # finished a review round is most likely to want it.
+        state["can_export"] = True
         # None until a retrain has completed at least once this session - the
         # comparison is only meaningful once there's a "current" round to report on.
         state["run_comparison"] = self._session.run_comparison
@@ -56,6 +60,10 @@ class ActiveLearningAPI(LabelingAPI):
         # in ActiveLearningSession.__init__ against whatever checkpoint already
         # exists), so this panel is visible even before any retrain happens.
         state["confusion_matrix"] = self._session.confusion_matrix
+        # How much of the frozen test split has been blind-reviewed - shown next to the
+        # confusion matrix so the operator can tell how much to trust those numbers
+        # before exporting.
+        state["test_curation"] = self._session.test_curation
         if not state["done"]:
             item = self._session.current_item()
             state.update({
@@ -73,6 +81,14 @@ class ActiveLearningAPI(LabelingAPI):
 
     def get_training_progress(self):
         return self._session.training_progress
+
+    def export_detector(self):
+        # Not named export() like the session method it forwards to: this one becomes a
+        # property on the JS-side api object, and `export` is a reserved word there.
+        #
+        # Fast enough to stay a blocking call (two file copies) - unlike retrain(),
+        # there's nothing here worth a background thread and a polling loop.
+        return self._session.export()
 
 
 class BlindTestReviewAPI(LabelingAPI):
