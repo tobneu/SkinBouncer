@@ -2,8 +2,12 @@
 prediction diverges from each image's recorded class, and walks them in that order -
 the active-learning counterpart to review_session.ReviewSession's plain folder walk.
 
-The frozen test split is never loaded, scored, or shown here - see
-skinbouncer_core.detector_project's module docstring on why test must stay untouched.
+The frozen test split is never loaded into the ranked review queue, and this session
+never relabels or otherwise mutates it - see skinbouncer_core.detector_project's module
+docstring on why test must stay untouched by that loop. It is, separately, read-only
+scored via skinbouncer_core.evaluate_confusion_matrix purely to report held-out test
+performance to the UI; that scoring never feeds _build_ranked_items or relabel_image,
+so it doesn't reintroduce test data into the review flow.
 
 Ranking: a single continuous "suspicion" score subsumes both signals the issue asks
 for (near-threshold uncertainty and confident disagreement) as different magnitudes of
@@ -40,6 +44,7 @@ from pathlib import Path
 
 from skinbouncer_core import (
     compare_runs,
+    evaluate_confusion_matrix,
     get_split_filepaths,
     load_images,
     load_manifest,
@@ -85,6 +90,7 @@ class ActiveLearningSession:
             )
         self.model = load_model(model_path)
         self.threshold = json.loads(threshold_path.read_text())["threshold"]
+        self.confusion_matrix = evaluate_confusion_matrix(self.manifest, self.model, self.threshold)
 
         self.items = self._build_ranked_items()
         self.index = 0
@@ -187,6 +193,7 @@ class ActiveLearningSession:
                 self.items = self._build_ranked_items()
                 self.index = 0
                 self.run_comparison = compare_runs(self.project_dir, n=5)
+                self.confusion_matrix = evaluate_confusion_matrix(self.manifest, self.model, self.threshold)
                 self.training_progress["status"] = "done"
             except Exception as e:
                 self.training_progress["status"] = "error"

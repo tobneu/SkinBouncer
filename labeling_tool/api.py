@@ -52,6 +52,10 @@ class ActiveLearningAPI(LabelingAPI):
         # None until a retrain has completed at least once this session - the
         # comparison is only meaningful once there's a "current" round to report on.
         state["run_comparison"] = self._session.run_comparison
+        # Unlike run_comparison, populated from the very first launch (computed once
+        # in ActiveLearningSession.__init__ against whatever checkpoint already
+        # exists), so this panel is visible even before any retrain happens.
+        state["confusion_matrix"] = self._session.confusion_matrix
         if not state["done"]:
             item = self._session.current_item()
             state.update({

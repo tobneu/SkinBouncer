@@ -12,6 +12,7 @@ from .detector_project import (
 )
 from .train import train_detector
 from .run_history import append_run_history, compare_runs
+from .evaluation import evaluate_confusion_matrix
 
 __all__ = [
     "IMG_SIZE",
@@ -33,4 +34,5 @@ __all__ = [
     "train_detector",
     "append_run_history",
     "compare_runs",
+    "evaluate_confusion_matrix",
 ]

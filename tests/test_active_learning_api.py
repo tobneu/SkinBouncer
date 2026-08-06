@@ -15,6 +15,7 @@ class _StubSession:
         self.retrain_calls = 0
         self.training_progress = {"status": "idle"}
         self.run_comparison = None
+        self.confusion_matrix = None
 
     def total(self):
         return len(self.items)
@@ -88,6 +89,16 @@ def test_get_state_reflects_session_run_comparison(tmp_path):
     state = api.get_state()
 
     assert state["run_comparison"] == session.run_comparison
+
+
+def test_get_state_reflects_session_confusion_matrix(tmp_path):
+    session = _StubSession([])
+    session.confusion_matrix = {"tp": 2, "tn": 2, "fp": 0, "fn": 0, "n": 4}
+    api = ActiveLearningAPI(session)
+
+    state = api.get_state()
+
+    assert state["confusion_matrix"] == session.confusion_matrix
 
 
 def test_retrain_starts_training_and_returns_ack(tmp_path):

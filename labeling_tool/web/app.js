@@ -15,6 +15,12 @@ const trainingProgressEl = document.getElementById("training-progress");
 const trainingEpochLabelEl = document.getElementById("training-epoch-label");
 const trainingChartEl = document.getElementById("training-chart");
 const runComparisonEl = document.getElementById("run-comparison");
+const confusionMatrixEl = document.getElementById("confusion-matrix");
+const confusionMatrixHeadlineEl = document.getElementById("confusion-matrix-headline");
+const cmTnEl = document.getElementById("cm-tn");
+const cmFpEl = document.getElementById("cm-fp");
+const cmFnEl = document.getElementById("cm-fn");
+const cmTpEl = document.getElementById("cm-tp");
 
 let currentState = null;
 let busy = false;
@@ -77,6 +83,21 @@ function render(state) {
   if ("run_comparison" in state) {
     renderRunComparison(state.run_comparison);
   }
+
+  // Only ActiveLearningAPI sets this key - populated from the very first launch
+  // (computed once a checkpoint exists), unlike run_comparison.
+  if ("confusion_matrix" in state) {
+    renderConfusionMatrix(state.confusion_matrix);
+  }
+}
+
+// Shared with the run-comparison bar chart, so both visuals stretch/compress AUC
+// values onto the same 0.5-1.0-or-wider scale rather than each picking their own
+// range - a jump that looks big in one chart looks equally big in the other.
+function aucRange(values) {
+  const minV = Math.min(...values, 0.5);
+  const maxV = Math.max(...values, 1.0);
+  return { minV, maxV, range: maxV - minV || 1 };
 }
 
 function renderRunComparison(comparison) {
@@ -85,19 +106,62 @@ function renderRunComparison(comparison) {
     runComparisonEl.innerHTML = "";
     return;
   }
-  const lines = [`New val AUC: ${comparison.current.val_auc.toFixed(3)}`];
-  if (comparison.previous.length === 0) {
-    lines.push("(first recorded run for this project)");
-  } else {
-    comparison.previous.forEach((run, i) => {
-      const pct = run.pct_change == null
-        ? "n/a"
-        : `${run.pct_change >= 0 ? "+" : ""}${run.pct_change.toFixed(1)}%`;
-      lines.push(`vs ${i + 1} round${i === 0 ? "" : "s"} ago (${run.val_auc.toFixed(3)}): ${pct}`);
-    });
-  }
-  runComparisonEl.innerHTML = lines.map((line) => `<div>${line}</div>`).join("");
+
+  const rounds = [
+    { label: "Now", val_auc: comparison.current.val_auc, current: true, delta: null },
+    ...comparison.previous.map((run, i) => ({
+      label: `${i + 1} round${i === 0 ? "" : "s"} ago`,
+      val_auc: run.val_auc,
+      current: false,
+      delta: run.pct_change,
+    })),
+  ];
+  const { minV, range } = aucRange(rounds.map((r) => r.val_auc));
+
+  const bars = rounds.map((round) => {
+    const heightPct = ((round.val_auc - minV) / range) * 100;
+    const deltaHtml = round.delta == null
+      ? ""
+      : `<div class="run-comparison-delta ${round.delta >= 0 ? "up" : "down"}">${round.delta >= 0 ? "+" : ""}${round.delta.toFixed(1)}%</div>`;
+    return `
+      <div class="run-comparison-bar">
+        <div class="run-comparison-value">${round.val_auc.toFixed(3)}</div>
+        <div class="run-comparison-fill ${round.current ? "current" : ""}" style="height: ${heightPct}%"></div>
+        <div class="run-comparison-label">${round.label}</div>
+        ${deltaHtml}
+      </div>`;
+  }).join("");
+
+  const note = comparison.previous.length === 0
+    ? `<div class="run-comparison-note">First recorded run for this project - nothing to compare against yet.</div>`
+    : "";
+
+  runComparisonEl.innerHTML = `
+    <div class="run-comparison-headline">Validation accuracy: ${comparison.current.val_auc.toFixed(3)}</div>
+    <div class="run-comparison-track">${bars}</div>
+    ${note}`;
   runComparisonEl.classList.remove("hidden");
+}
+
+function renderConfusionMatrix(cm) {
+  if (!cm) {
+    confusionMatrixEl.classList.add("hidden");
+    return;
+  }
+  const fill = (el, count) => {
+    const pct = Math.round((count / cm.n) * 100);
+    el.innerHTML = `<div class="count">${count}</div><div class="pct">${pct}%</div>`;
+  };
+  fill(cmTnEl, cm.tn);
+  fill(cmFpEl, cm.fp);
+  fill(cmFnEl, cm.fn);
+  fill(cmTpEl, cm.tp);
+
+  const correct = cm.tp + cm.tn;
+  const correctPct = Math.round((correct / cm.n) * 100);
+  confusionMatrixHeadlineEl.textContent =
+    `Correctly classified ${correctPct}% of test images (${correct} of ${cm.n})`;
+  confusionMatrixEl.classList.remove("hidden");
 }
 
 function renderTrainingProgress(progress) {
@@ -111,18 +175,52 @@ function drawTrainingChart(history) {
   const h = trainingChartEl.height;
   ctx.clearRect(0, 0, w, h);
 
+  const style = getComputedStyle(document.documentElement);
   const series = [
-    { data: history.auc || [], color: "#f59e0b" },
-    { data: history.val_auc || [], color: "#14b8a6" },
+    { data: history.auc || [], color: style.getPropertyValue("--series-train").trim() },
+    { data: history.val_auc || [], color: style.getPropertyValue("--series-val").trim() },
   ];
   const allValues = series.flatMap((s) => s.data);
   if (allValues.length === 0) {
     return;
   }
-  const pad = 8;
-  const minV = Math.min(...allValues, 0.5);
-  const maxV = Math.max(...allValues, 1.0);
-  const range = maxV - minV || 1;
+
+  const margin = { top: 8, right: 10, bottom: 20, left: 30 };
+  const plotW = w - margin.left - margin.right;
+  const plotH = h - margin.top - margin.bottom;
+  const { minV, maxV, range } = aucRange(allValues);
+  const xOf = (i, len) => margin.left + (i / Math.max(len - 1, 1)) * plotW;
+  const yOf = (value) => margin.top + plotH - ((value - minV) / range) * plotH;
+
+  // Y-axis: gridlines + tick labels at min/mid/max, so the plotted lines' vertical
+  // position is readable without knowing what AUC is - just "higher is better".
+  ctx.strokeStyle = style.getPropertyValue("--panel-border").trim();
+  ctx.fillStyle = style.getPropertyValue("--muted").trim();
+  ctx.font = "10px sans-serif";
+  ctx.textBaseline = "middle";
+  [minV, (minV + maxV) / 2, maxV].forEach((tick) => {
+    const y = yOf(tick);
+    ctx.beginPath();
+    ctx.moveTo(margin.left, y);
+    ctx.lineTo(w - margin.right, y);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.textAlign = "right";
+    ctx.fillText(tick.toFixed(2), margin.left - 6, y);
+  });
+
+  // X-axis: epoch numbers, thinned to roughly 5 ticks regardless of how many
+  // epochs training ran for.
+  const epochCount = Math.max(...series.map((s) => s.data.length));
+  if (epochCount > 0) {
+    const step = [1, 2, 5, 10, 20, 50, 100].find((s) => epochCount / s <= 5) || 100;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    for (let epoch = 1; epoch <= epochCount; epoch += step) {
+      const x = xOf(epoch - 1, epochCount);
+      ctx.fillText(String(epoch), x, h - margin.bottom + 4);
+    }
+  }
 
   series.forEach(({ data, color }) => {
     if (data.length === 0) {
@@ -132,8 +230,8 @@ function drawTrainingChart(history) {
     ctx.strokeStyle = color;
     ctx.lineWidth = 2;
     data.forEach((value, i) => {
-      const x = pad + (i / Math.max(data.length - 1, 1)) * (w - pad * 2);
-      const y = h - pad - ((value - minV) / range) * (h - pad * 2);
+      const x = xOf(i, data.length);
+      const y = yOf(value);
       if (i === 0) {
         ctx.moveTo(x, y);
       } else {
@@ -177,6 +275,9 @@ function retrain() {
   setControlsDisabled(true);
   btnRetrainEl.textContent = "Training…";
   runComparisonEl.classList.add("hidden");
+  // Hidden for the duration so it never shows numbers from a checkpoint that's
+  // mid-replacement - render(state) brings it back once the new one is scored.
+  confusionMatrixEl.classList.add("hidden");
   trainingProgressEl.classList.remove("hidden");
   window.pywebview.api
     .retrain()

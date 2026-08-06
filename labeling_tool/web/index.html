@@ -48,10 +48,30 @@
 
       <div id="training-progress" class="training-progress hidden">
         <div id="training-epoch-label" class="training-epoch-label"></div>
-        <canvas id="training-chart" width="392" height="120"></canvas>
+        <div class="chart-legend">
+          <span class="legend-item"><span class="legend-swatch swatch-train"></span>Training</span>
+          <span class="legend-item"><span class="legend-swatch swatch-val"></span>Validation (unseen during training)</span>
+        </div>
+        <canvas id="training-chart" width="392" height="150"></canvas>
       </div>
 
       <div id="run-comparison" class="run-comparison hidden"></div>
+
+      <div id="confusion-matrix" class="confusion-matrix hidden">
+        <div id="confusion-matrix-headline" class="confusion-matrix-headline"></div>
+        <div class="confusion-matrix-grid">
+          <div class="cm-corner"></div>
+          <div class="cm-axis-label">Predicted good</div>
+          <div class="cm-axis-label">Predicted bad</div>
+          <div class="cm-axis-label">Actually good</div>
+          <div id="cm-tn" class="confusion-matrix-cell correct"></div>
+          <div id="cm-fp" class="confusion-matrix-cell incorrect"></div>
+          <div class="cm-axis-label">Actually bad</div>
+          <div id="cm-fn" class="confusion-matrix-cell incorrect"></div>
+          <div id="cm-tp" class="confusion-matrix-cell correct"></div>
+        </div>
+        <div class="confusion-matrix-caption">Measured on test images the model never trained or tuned on.</div>
+      </div>
 
       <button id="btn-retrain" class="btn btn-retrain hidden" onclick="retrain()">🔄 Retrain</button>
     </div>
