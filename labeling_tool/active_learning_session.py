@@ -37,7 +37,14 @@ checkpoint is" framing as a per-launch guarantee, not a per-decision one.
 import json
 from pathlib import Path
 
-from skinbouncer_core import get_split_filepaths, load_images, load_manifest, load_model, relabel_image
+from skinbouncer_core import (
+    get_split_filepaths,
+    load_images,
+    load_manifest,
+    load_model,
+    relabel_image,
+    train_detector,
+)
 
 ACTIONS = ("good", "bad", "skip")
 BORDERLINE_BAND = 0.10
@@ -142,3 +149,16 @@ class ActiveLearningSession:
             self.relabel_count += 1
 
         self.index += 1
+
+    def retrain(self, epochs=50, batch_size=32, lr=1e-4, patience=5):
+        """Fine-tune the current checkpoint against whatever the manifest looks like
+        right now (including any relabels made so far this session), then re-rank the
+        queue against the new checkpoint. lr/patience default lower than
+        train_detector's own cold-start defaults - a warm-started model converges (or
+        plateaus) faster than one starting from random init."""
+        train_detector(self.project_dir, epochs=epochs, batch_size=batch_size,
+                        lr=lr, patience=patience, warm_start=True)
+        self.model = load_model(self.project_dir / "model.keras")
+        self.threshold = json.loads((self.project_dir / "threshold.json").read_text())["threshold"]
+        self.items = self._build_ranked_items()
+        self.index = 0

@@ -211,6 +211,12 @@ body {
   border-color: var(--accent);
 }
 
+.btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+  transform: none;
+}
+
 .btn .key {
   font-size: 11px;
   font-weight: 600;
@@ -236,6 +242,17 @@ body {
 }
 
 .btn-skip:hover {
+  background: var(--neutral-btn-hover);
+}
+
+.btn-retrain {
+  width: 100%;
+  margin-top: 12px;
+  background: var(--neutral-btn);
+  color: var(--text);
+}
+
+.btn-retrain:hover {
   background: var(--neutral-btn-hover);
 }
 

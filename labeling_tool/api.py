@@ -45,6 +45,10 @@ class ActiveLearningAPI(LabelingAPI):
 
     def get_state(self):
         state = super().get_state()
+        # Set unconditionally (unlike the fields below) so the frontend can tell
+        # whether to show the Retrain button even on the "done" screen, where
+        # current_item() is None and the ranking-only fields aren't available.
+        state["can_retrain"] = True
         if not state["done"]:
             item = self._session.current_item()
             state.update({
@@ -53,3 +57,7 @@ class ActiveLearningAPI(LabelingAPI):
                 "reason": item["reason"],
             })
         return state
+
+    def retrain(self):
+        self._session.retrain()
+        return self.get_state()

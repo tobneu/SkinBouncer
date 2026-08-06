@@ -12,6 +12,7 @@ class _StubSession:
         self.items = items
         self.index = 0
         self.decisions = []
+        self.retrain_calls = 0
 
     def total(self):
         return len(self.items)
@@ -32,6 +33,10 @@ class _StubSession:
     def decide(self, action):
         self.decisions.append(action)
         self.index += 1
+
+    def retrain(self):
+        self.retrain_calls += 1
+        self.index = 0
 
 
 def _fake_png(tmp_path, name):
@@ -59,6 +64,7 @@ def test_get_state_includes_ranking_metadata(tmp_path):
     assert state["recorded_class"] == "good"
     assert state["predicted_prob"] == 0.87
     assert state["reason"] == "model disagrees"
+    assert state["can_retrain"] is True
 
 
 def test_get_state_done_has_no_ranking_metadata(tmp_path):
@@ -68,6 +74,23 @@ def test_get_state_done_has_no_ranking_metadata(tmp_path):
     assert "recorded_class" not in state
     assert "predicted_prob" not in state
     assert "reason" not in state
+    assert state["can_retrain"] is True
+
+
+def test_retrain_forwards_to_session_and_returns_fresh_state(tmp_path):
+    items = [{
+        "key": "good/a.png", "path": _fake_png(tmp_path, "a.png"), "recorded_class": "good",
+        "prob": 0.2, "suspicion": 0.2, "reason": "confident agreement",
+    }]
+    session = _StubSession(items)
+    session.index = 1  # simulate mid-queue before retrain resets it
+    api = ActiveLearningAPI(session)
+
+    state = api.retrain()
+
+    assert session.retrain_calls == 1
+    assert state["can_retrain"] is True
+    assert state["filename"] == "a.png"  # index was reset to 0 by the stub's retrain()
 
 
 def test_decide_forwards_action_and_returns_fresh_state(tmp_path):

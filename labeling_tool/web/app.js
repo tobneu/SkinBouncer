@@ -9,9 +9,17 @@ const metaReasonEl = document.getElementById("meta-reason");
 const metaProbEl = document.getElementById("meta-prob");
 const btnGoodEl = document.getElementById("btn-good");
 const btnBadEl = document.getElementById("btn-bad");
+const btnSkipEl = document.getElementById("btn-skip");
+const btnRetrainEl = document.getElementById("btn-retrain");
 
 let currentState = null;
 let busy = false;
+
+function setControlsDisabled(disabled) {
+  [btnGoodEl, btnBadEl, btnSkipEl, btnRetrainEl].forEach((btn) => {
+    btn.disabled = disabled;
+  });
+}
 
 function render(state) {
   currentState = state;
@@ -19,6 +27,11 @@ function render(state) {
     ? `Done — reviewed ${state.total} / ${state.total}`
     : `Reviewing ${state.index + 1} / ${state.total}`;
   progressFillEl.style.width = `${state.total ? (state.index / state.total) * 100 : 0}%`;
+
+  // can_retrain is only set by ActiveLearningAPI (not the plain labeling tool's
+  // LabelingAPI), and unlike recorded_class/reason/predicted_prob it's present in
+  // both the done and not-done states, so the button stays visible on the done screen.
+  btnRetrainEl.classList.toggle("hidden", !state.can_retrain);
 
   if (state.done) {
     imageEl.classList.add("hidden");
@@ -55,10 +68,12 @@ function decide(action) {
     return;
   }
   busy = true;
+  setControlsDisabled(true);
   window.pywebview.api
     .decide(action)
     .then((state) => {
       busy = false;
+      setControlsDisabled(false);
       render(state);
     })
     .catch((error) => {
@@ -66,7 +81,31 @@ function decide(action) {
       // The session's index didn't advance server-side, so the currently shown item
       // is still valid - just unstick input instead of leaving the app frozen.
       busy = false;
+      setControlsDisabled(false);
       alert(`Couldn't apply that decision:\n\n${error}\n\nYou can Skip this image instead.`);
+    });
+}
+
+function retrain() {
+  if (busy) {
+    return;
+  }
+  busy = true;
+  setControlsDisabled(true);
+  btnRetrainEl.textContent = "Training…";
+  window.pywebview.api
+    .retrain()
+    .then((state) => {
+      busy = false;
+      setControlsDisabled(false);
+      btnRetrainEl.textContent = "🔄 Retrain";
+      render(state);
+    })
+    .catch((error) => {
+      busy = false;
+      setControlsDisabled(false);
+      btnRetrainEl.textContent = "🔄 Retrain";
+      alert(`Retrain failed:\n\n${error}`);
     });
 }
 

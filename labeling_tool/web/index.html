@@ -38,13 +38,15 @@
         <button id="btn-bad" class="btn btn-bad" onclick="decide('bad')">
           ✕ Bad <span class="key">B</span>
         </button>
-        <button class="btn btn-skip" onclick="decide('skip')">
+        <button id="btn-skip" class="btn btn-skip" onclick="decide('skip')">
           ↷ Skip <span class="key">Space</span>
         </button>
         <button id="btn-good" class="btn btn-good" onclick="decide('good')">
           ✓ Good <span class="key">G</span>
         </button>
       </div>
+
+      <button id="btn-retrain" class="btn btn-retrain hidden" onclick="retrain()">🔄 Retrain</button>
     </div>
   </main>
 

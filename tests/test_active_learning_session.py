@@ -152,6 +152,22 @@ def test_decide_rejects_unknown_action(tmp_path):
         session.decide("maybe")
 
 
+def test_retrain_rebuilds_items_and_resets_index(tmp_path):
+    project_dir = _make_trained_project(tmp_path)
+    session = ActiveLearningSession(project_dir)
+    session.decide("skip")
+    session.decide("skip")
+    relabel_count_before = session.relabel_count
+    old_model_path_mtime = (project_dir / "model.keras").stat().st_mtime
+
+    session.retrain(epochs=1, batch_size=8)
+
+    assert session.index == 0
+    assert len(session.items) > 0
+    assert session.relabel_count == relabel_count_before
+    assert (project_dir / "model.keras").stat().st_mtime >= old_model_path_mtime
+
+
 def test_decide_relabel_collision_leaves_session_unchanged(tmp_path):
     # Regression test: a real run hit this via the GUI - two different images
     # happened to share a filename across good/bad, so relabel_image's collision
