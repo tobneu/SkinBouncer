@@ -154,7 +154,7 @@ def get_split_filepaths(manifest, split):
     return result
 
 
-def relabel_image(manifest, project_dir, key, new_class):
+def relabel_image(manifest, project_dir, key, new_class, allow_test=False):
     """Move an image between good_dir/bad_dir, swap its manifest key/class, and
     persist the manifest immediately - this is what "an active-learning round moved
     an image between classes" (see module docstring) concretely means. `split` is
@@ -163,11 +163,16 @@ def relabel_image(manifest, project_dir, key, new_class):
 
     Mutates `manifest` in place and returns the new key (e.g. "bad/filename.png").
 
+    allow_test=False (default) refuses to touch split=="test" entries - the
+    active-learning queue relies on this to never contaminate the frozen test set with
+    a model-driven decision. The blind test-review mode (which shows no model output at
+    all) is the only caller that passes allow_test=True.
+
     Raises:
         KeyError: `key` is not in manifest["images"].
         ValueError: `new_class` isn't "good"/"bad", equals the image's current class
             (callers should skip that case rather than call this as a no-op), or the
-            image's split is "test" (the frozen test set must never be touched here).
+            image's split is "test" and allow_test is False.
         FileExistsError: a different image already occupies the target filename in
             the destination directory - refuses to silently overwrite it.
     """
@@ -175,7 +180,7 @@ def relabel_image(manifest, project_dir, key, new_class):
         raise ValueError(f'new_class must be "good" or "bad", got {new_class!r}')
 
     info = manifest["images"][key]
-    if info["split"] == "test":
+    if info["split"] == "test" and not allow_test:
         raise ValueError(f"refusing to relabel {key!r}: it's in the frozen test split")
     if info["class"] == new_class:
         raise ValueError(f"{key!r} is already class {new_class!r}")
