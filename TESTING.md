@@ -60,6 +60,28 @@ So `tests/test_train.py` uses two different strategies for two different things:
 Pure helper functions with no ML in them (`_compute_sample_weights`, `_load_split_arrays`,
 `_write_json`) are tested directly and cheaply, same as any other pure logic.
 
+### Front-end: render it offscreen rather than trusting it by eye
+
+The "rely on manual verification" advice above still holds for *judgement* calls - does
+this read well, is this contrast comfortable - but it turns out rather more than that
+can be checked automatically, without ever putting a window on someone's screen.
+
+`pywebview[qt]` already brings PyQt6, and `QWebEngineView` will lay out and paint into
+its own backing store with `WA_DontShowOnScreen` set. That gives two things: a PNG of
+the real UI in the real engine, and `page().runJavaScript(...)` to read values back out.
+Point it at a copy of `labeling_tool/web/index.html` with a stub `window.pywebview.api`
+injected, and the whole app shell renders against whatever state you want to describe.
+
+That's how `skin3d.js` was checked in: a generated skin texture with each of the six
+faces painted a different hue turns "does the model look right" into an assertion -
+sample a pixel, and the colour names which face the renderer chose. It caught three real
+defects that reviewing the code did not: mirrored legacy limbs rendering inside-out, an
+inverted pitch axis, and past-round bars in the run-comparison chart drawn in a colour
+that is identical to their own background in dark mode.
+
+Worth reaching for whenever a change is visual but its correctness is not a matter of
+taste - geometry, colour contrast, which control is visible in which mode.
+
 ### Contracts between two halves of the pipeline: test the round trip, not each side
 
 Some agreements aren't owned by either module that depends on them. `export_detector()`

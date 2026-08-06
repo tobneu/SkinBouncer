@@ -14,6 +14,9 @@
   --series-val: #14b8a6;
   --good-tint: rgba(34, 197, 94, 0.14);
   --bad-tint: rgba(239, 68, 68, 0.14);
+  /* Past-round bars need to read against --neutral-btn, which --panel-border happens to
+     match exactly in dark mode - reusing it there left those bars invisible. */
+  --bar-idle: #d3d7de;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -28,6 +31,7 @@
     --neutral-btn-hover: #363b46;
     --good-tint: rgba(34, 197, 94, 0.22);
     --bad-tint: rgba(239, 68, 68, 0.22);
+    --bar-idle: #495060;
   }
 }
 
@@ -112,23 +116,73 @@ body {
 
 .image-frame {
   position: relative;
-  width: 300px;
-  height: 300px;
-  margin: 0 auto 16px;
+  /* min-height, not a fixed height: the frame has to keep its shape when .skin-views
+     is hidden on the done screen, or the absolutely-positioned done message would have
+     nothing to fill. */
+  min-height: 200px;
+  margin: 0 auto 6px;
+  padding: 10px;
   background: var(--frame-bg);
   border: 1px solid var(--panel-border);
   border-radius: 14px;
+  overflow: hidden;
+}
+
+.skin-views {
+  display: flex;
+  gap: 8px;
+}
+
+.skin-view {
+  flex: 1;
+  /* Without this a wide canvas would refuse to shrink below its own content size and
+     push the three panels past the card's edge. */
+  min-width: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.skin-view-body {
+  height: 164px;
+  border-radius: 10px;
+  background: var(--panel);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
 }
 
+.skin-view-label {
+  font-size: 10px;
+  color: var(--muted);
+  text-align: center;
+}
+
 #skin-image {
-  width: 260px;
-  height: 260px;
+  width: 100px;
+  height: 100px;
   object-fit: contain;
   image-rendering: pixelated;
+}
+
+.skin-canvas {
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  /* Stops the drag being swallowed as a scroll/zoom gesture before pointermove fires. */
+  touch-action: none;
+}
+
+.skin-canvas:active {
+  cursor: grabbing;
+}
+
+.skin-views-hint {
+  font-size: 10px;
+  color: var(--muted);
+  margin-bottom: 10px;
 }
 
 .done-message {
@@ -362,7 +416,7 @@ body {
   width: 100%;
   min-height: 4px;
   border-radius: 6px 6px 0 0;
-  background: var(--panel-border);
+  background: var(--bar-idle);
 }
 
 .run-comparison-fill.current {
