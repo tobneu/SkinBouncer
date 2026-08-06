@@ -60,6 +60,23 @@ So `tests/test_train.py` uses two different strategies for two different things:
 Pure helper functions with no ML in them (`_compute_sample_weights`, `_load_split_arrays`,
 `_write_json`) are tested directly and cheaply, same as any other pure logic.
 
+### Contracts between two halves of the pipeline: test the round trip, not each side
+
+Some agreements aren't owned by either module that depends on them. `export_detector()`
+writes a detector folder; the deployment API's `load_detectors()` reads one. Each side
+has its own tests, and both can pass while the two disagree about a filename, a folder
+layout or a JSON key - a mismatch that surfaces only as a deployed image with silently
+zero detectors loaded, which looks identical to "nothing exported yet".
+
+`test_api_loads_and_scores_a_detector_produced_by_export_detector` in
+`tests/test_deployment_api.py` covers that seam by driving the whole round trip: train
+a project somewhere unrelated, export it, then import the API against the exported
+folder and assert it both lists the detector and scores with the exported threshold.
+
+Worth writing when two components communicate through a **format** rather than a
+function call - a directory layout, a file on disk, a serialized payload - because
+that's exactly where no single unit test naturally sits.
+
 ## Adding a new test
 
 - If the code under test has no external dependencies (files, subprocesses, network,

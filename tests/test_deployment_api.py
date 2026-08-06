@@ -14,7 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from skinbouncer_core import setup_detector_project
+from skinbouncer_core import export_detector, setup_detector_project
 from skinbouncer_core.train import train_detector
 
 API_DIR = Path(__file__).resolve().parents[1] / "06_Deployment" / "api"
@@ -144,3 +144,42 @@ def test_check_player_returns_scores_for_a_configured_detector(monkeypatch, tmp_
     assert set(categories.keys()) == {"nsfw"}
     assert 0.0 <= categories["nsfw"]["score"] <= 1.0
     assert isinstance(categories["nsfw"]["risk"], bool)
+
+
+def test_api_loads_and_scores_a_detector_produced_by_export_detector(monkeypatch, tmp_path):
+    """Closes the loop between the two halves of the pipeline: the labeling tool's
+    Export writes a folder, and load_detectors() reads one. Nothing else checks that
+    those two agree on the layout, filenames and threshold format - a change to either
+    side alone would otherwise only surface as a silently detector-less deployment.
+    """
+    monkeypatch.chdir(tmp_path)
+    good_dir = tmp_path / "_src_good"
+    bad_dir = tmp_path / "hate_spiders"
+    _make_fixture_images(good_dir, "good", 16, (0, 200, 0, 255))
+    _make_fixture_images(bad_dir, "bad", 16, (200, 0, 0, 255))
+
+    # Trained somewhere entirely unrelated to the deployment layout, the way a real
+    # detector project is - export is what puts it where the API can find it.
+    project_dir = tmp_path / "detector_projects" / "spider_project"
+    setup_detector_project(good_dir, bad_dir, project_dir)
+    train_detector(project_dir, epochs=1, batch_size=8)
+
+    result = export_detector(project_dir, detectors_dir=tmp_path / "models" / "detectors")
+
+    module = _import_main("deployment_api_main_from_export")
+    _stub_downloader(monkeypatch, module)
+    client = TestClient(module.app)
+
+    root = client.get("/")
+    _print_response("GET / (detector from export_detector)", root)
+    assert root.json()["detectors"] == ["hate_spiders"]
+
+    res = client.post("/check/player/", json={"player_name": "SpiderMan"})
+    _print_response("POST /check/player/ (detector from export_detector)", res)
+
+    assert res.status_code == 200
+    scored = res.json()["categories"]["hate_spiders"]
+    assert 0.0 <= scored["score"] <= 1.0
+    # The API's accept/reject call must use the threshold export copied over, not the
+    # 0.5 default that would silently take over if threshold.json failed to load.
+    assert scored["risk"] == (scored["score"] > result["threshold"])
