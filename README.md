@@ -173,6 +173,12 @@ loaded or shown. Each launch recomputes the full ranked queue fresh against what
 checkpoint currently exists - there's no cross-session memory of already-reviewed
 images. See `labeling_tool/active_learning_session.py` for the ranking formula.
 
+The Retrain button lets you fine-tune without leaving the app: it warm-starts from the
+current checkpoint (not a fresh random init) against whatever the manifest looks like
+right now, including any relabels made so far, then re-ranks the queue from the top
+against the new checkpoint. The UI disables input and shows "Training…" for the
+duration - label a batch, hit Retrain, repeat, for as many rounds as you want.
+
 ### Reproduce the experiments
 
 1. Make sure the dataset is present under `data/skins/good_cleaned/` and

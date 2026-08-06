@@ -102,6 +102,38 @@ def test_compute_sample_weights_handles_single_class_without_div_by_zero():
     assert len(weights) == 3
 
 
+def test_train_detector_warm_start_loads_existing_model_instead_of_building_fresh(tmp_path):
+    project_dir = _make_project(tmp_path)
+    train_detector(project_dir, epochs=1, batch_size=8)
+
+    with patch("skinbouncer_core.train.build_cnn") as mock_build_cnn:
+        result = train_detector(project_dir, epochs=1, batch_size=8, warm_start=True)
+
+    mock_build_cnn.assert_not_called()
+    assert result["model_path"].exists()
+
+
+def test_train_detector_warm_start_reuses_previous_recall_target_by_default(tmp_path):
+    project_dir = _make_project(tmp_path)
+    train_detector(project_dir, epochs=1, batch_size=8, recall_target=0.8)
+
+    result = train_detector(project_dir, epochs=1, batch_size=8, warm_start=True)
+
+    assert result["metrics_path"].exists()
+    metrics = json.loads(result["metrics_path"].read_text())
+    assert metrics["threshold_search"]["recall_target"] == pytest.approx(0.8)
+
+
+def test_train_detector_warm_start_explicit_recall_target_overrides_reuse(tmp_path):
+    project_dir = _make_project(tmp_path)
+    train_detector(project_dir, epochs=1, batch_size=8, recall_target=0.8)
+
+    result = train_detector(project_dir, epochs=1, batch_size=8, warm_start=True, recall_target=0.6)
+
+    metrics = json.loads(result["metrics_path"].read_text())
+    assert metrics["threshold_search"]["recall_target"] == pytest.approx(0.6)
+
+
 def test_write_json_round_trips(tmp_path):
     path = tmp_path / "out.json"
     _write_json(path, {"threshold": 0.5})

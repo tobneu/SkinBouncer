@@ -18,6 +18,7 @@ deviations from a direct copy:
   weights, not whatever epoch training happened to stop on after `patience` more rounds.
 """
 
+import json
 import random
 from pathlib import Path
 
@@ -27,7 +28,7 @@ import tensorflow as tf
 from .architecture import build_cnn
 from .augmentation import build_augmentation
 from .detector_project import _write_json, get_split_filepaths, load_manifest
-from .model_io import save_model
+from .model_io import load_model, save_model
 from .preprocessing import load_images
 from .threshold import find_threshold_for_recall
 
@@ -51,6 +52,15 @@ def _compute_sample_weights(y_train):
     return np.where(y_train == 1, class_weights[1], class_weights[0])
 
 
+def _previous_recall_target(project_dir, default):
+    """Reused by warm-start retraining so a prior --recall-target choice sticks across
+    rounds instead of silently resetting to the function default."""
+    metrics_path = Path(project_dir) / "metrics.json"
+    if not metrics_path.exists():
+        return default
+    return json.loads(metrics_path.read_text())["threshold_search"]["recall_target"]
+
+
 def _metrics_at_best_epoch(history):
     """EarlyStopping(restore_best_weights=True) means the model in memory (and about to
     be saved) is the best epoch's weights, not the last one trained - so report metrics
@@ -62,14 +72,23 @@ def _metrics_at_best_epoch(history):
 
 
 def train_detector(project_dir, epochs=50, batch_size=32, lr=3e-4, patience=10,
-                    recall_target=0.95, seed=None):
+                    recall_target=None, seed=None, warm_start=False):
     """Train a detector on a project's frozen train/val split. Writes model.keras,
     threshold.json and metrics.json into project_dir. Returns a dict describing the
-    run (checkpoint/metrics paths, history, val metrics, threshold info)."""
+    run (checkpoint/metrics paths, history, val metrics, threshold info).
+
+    warm_start=True loads the project's existing model.keras and continues training
+    it (fine-tune) instead of building a fresh randomly-initialized model - used by
+    the active-learning queue's Retrain action. recall_target=None resolves to 0.95
+    normally, or to the previous run's recall_target when warm_start is True (see
+    _previous_recall_target), so an operator's earlier --recall-target choice sticks
+    across retrain rounds unless explicitly overridden."""
     project_dir = Path(project_dir)
     manifest = load_manifest(project_dir)
     if seed is None:
         seed = manifest["seed"]
+    if recall_target is None:
+        recall_target = _previous_recall_target(project_dir, default=0.95) if warm_start else 0.95
 
     random.seed(seed)
     np.random.seed(seed)
@@ -82,7 +101,7 @@ def train_detector(project_dir, epochs=50, batch_size=32, lr=3e-4, patience=10,
     train_dataset = tf.data.Dataset.from_tensor_slices((X_train, y_train, sample_weights))
     train_dataset = train_dataset.shuffle(buffer_size=max(len(y_train), 1), seed=seed).batch(batch_size)
 
-    model = build_cnn(augmentation=build_augmentation())
+    model = load_model(project_dir / "model.keras") if warm_start else build_cnn(augmentation=build_augmentation())
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=lr),
         # Single sigmoid output (good=0/bad=1) -> standard binary classification loss.
