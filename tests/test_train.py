@@ -1,10 +1,17 @@
 import json
 from unittest.mock import patch
 
+import numpy as np
+import pytest
 from PIL import Image
 
 from skinbouncer_core import load_model, setup_detector_project
-from skinbouncer_core.train import _load_split_arrays, train_detector
+from skinbouncer_core.train import (
+    _compute_sample_weights,
+    _load_split_arrays,
+    _write_json,
+    train_detector,
+)
 
 
 def _make_fixture_images(folder, prefix, n, color):
@@ -74,3 +81,52 @@ def test_load_split_arrays_labels_good_0_bad_1(tmp_path):
     X, y = _load_split_arrays(manifest, "train")
     assert X.shape[0] == 5
     assert list(y) == [0.0, 0.0, 0.0, 1.0, 1.0]
+
+
+def test_compute_sample_weights_is_inverse_frequency_per_class():
+    # 3 good (label 0), 1 bad (label 1) -> bad should get the larger weight
+    y_train = np.array([0.0, 0.0, 0.0, 1.0], dtype=np.float32)
+    weights = _compute_sample_weights(y_train)
+
+    good_weight = weights[y_train == 0][0]
+    bad_weight = weights[y_train == 1][0]
+    assert np.allclose(weights[y_train == 0], good_weight)  # same weight within a class
+    assert bad_weight > good_weight  # minority class weighted higher
+    assert good_weight == pytest.approx(4 / (2 * 3))
+    assert bad_weight == pytest.approx(4 / (2 * 1))
+
+
+def test_compute_sample_weights_handles_single_class_without_div_by_zero():
+    y_train = np.array([0.0, 0.0, 0.0], dtype=np.float32)
+    weights = _compute_sample_weights(y_train)  # must not raise ZeroDivisionError
+    assert len(weights) == 3
+
+
+def test_write_json_round_trips(tmp_path):
+    path = tmp_path / "out.json"
+    _write_json(path, {"threshold": 0.5})
+    assert json.loads(path.read_text()) == {"threshold": 0.5}
+
+
+def test_write_json_leaves_no_tmp_file_behind_on_success(tmp_path):
+    path = tmp_path / "out.json"
+    _write_json(path, {"a": 1})
+    leftover = [p for p in tmp_path.iterdir() if p != path]
+    assert leftover == []
+
+
+def test_write_json_does_not_corrupt_existing_file_on_failure(tmp_path, monkeypatch):
+    path = tmp_path / "out.json"
+    _write_json(path, {"threshold": 0.1})
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("simulated crash mid-write")
+
+    monkeypatch.setattr(json, "dump", _boom)
+    with pytest.raises(RuntimeError):
+        _write_json(path, {"threshold": 0.9})
+
+    # original file must survive untouched, and no leftover temp file
+    assert json.loads(path.read_text()) == {"threshold": 0.1}
+    leftover = [p for p in tmp_path.iterdir() if p != path]
+    assert leftover == []

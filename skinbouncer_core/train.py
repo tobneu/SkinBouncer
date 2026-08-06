@@ -5,18 +5,23 @@ checkpoint (+ threshold + metrics) into the project directory.
 Ported from `04_Modeling/Modeling.ipynb`'s training pipeline, with two deliberate
 deviations from a direct copy:
 
-- The train dataset is explicitly shuffled before batching. `get_split_filepaths`
-  returns good/bad images as two separate lists; concatenating them good-then-bad and
-  batching directly would produce near-homogeneous batches under real class imbalance
-  (most batches all "good"), badly hurting batchnorm statistics. The notebook never hit
-  this because sklearn's `train_test_split` already interleaves classes before batching.
+- The train dataset is explicitly shuffled before batching. `_stratified_assign` in
+  `detector_project.py` only shuffles filenames *within* each class before splitting -
+  it never interleaves good and bad with each other. `get_split_filepaths` then hands
+  back good/bad as two separate lists, and `_load_split_arrays` below concatenates them
+  good-then-bad. Left unshuffled at that point, batching would produce near-homogeneous
+  batches under real class imbalance (most batches all "good"), badly hurting batchnorm
+  statistics. The notebook never hit this because sklearn's `train_test_split` already
+  interleaves classes before its own batching.
 - Metrics are reported at the best epoch (by val_auc), not the last epoch trained.
   `EarlyStopping(restore_best_weights=True)` means the saved model is the best epoch's
   weights, not whatever epoch training happened to stop on after `patience` more rounds.
 """
 
 import json
+import os
 import random
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -39,6 +44,40 @@ def _load_split_arrays(manifest, split):
     return load_images(paths), np.array(labels, dtype=np.float32)
 
 
+def _compute_sample_weights(y_train):
+    """Inverse-frequency weight per sample, so the loss doesn't just learn to predict
+    the majority class - typically "good" outnumbers "bad" by a wide margin."""
+    n_total = len(y_train)
+    n_good = max(int((y_train == 0).sum()), 1)
+    n_bad = max(int((y_train == 1).sum()), 1)
+    class_weights = {0: n_total / (2 * n_good), 1: n_total / (2 * n_bad)}
+    return np.where(y_train == 1, class_weights[1], class_weights[0])
+
+
+def _metrics_at_best_epoch(history):
+    """EarlyStopping(restore_best_weights=True) means the model in memory (and about to
+    be saved) is the best epoch's weights, not the last one trained - so report metrics
+    from that same epoch rather than history.history[...][-1]."""
+    best_epoch = int(np.argmax(history.history["val_auc"]))
+    train_metrics = {k: float(v[best_epoch]) for k, v in history.history.items() if not k.startswith("val_")}
+    val_metrics = {k[4:]: float(v[best_epoch]) for k, v in history.history.items() if k.startswith("val_")}
+    return train_metrics, val_metrics
+
+
+def _write_json(path, data):
+    """Write via a temp file + atomic rename, so a crash or interrupt mid-write can
+    never leave a partially-written / corrupt JSON file at `path`."""
+    path = Path(path)
+    fd, tmp_path = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(data, f, indent=2)
+        os.replace(tmp_path, path)
+    except BaseException:
+        os.unlink(tmp_path)
+        raise
+
+
 def train_detector(project_dir, epochs=50, batch_size=32, lr=3e-4, patience=10,
                     recall_target=0.95, seed=None):
     """Train a detector on a project's frozen train/val split. Writes model.keras,
@@ -56,18 +95,14 @@ def train_detector(project_dir, epochs=50, batch_size=32, lr=3e-4, patience=10,
     X_train, y_train = _load_split_arrays(manifest, "train")
     X_val, y_val = _load_split_arrays(manifest, "val")
 
-    n_total = len(y_train)
-    n_good = max(int((y_train == 0).sum()), 1)
-    n_bad = max(int((y_train == 1).sum()), 1)
-    class_weights = {0: n_total / (2 * n_good), 1: n_total / (2 * n_bad)}
-    sample_weights = np.where(y_train == 1, class_weights[1], class_weights[0])
-
+    sample_weights = _compute_sample_weights(y_train)
     train_dataset = tf.data.Dataset.from_tensor_slices((X_train, y_train, sample_weights))
-    train_dataset = train_dataset.shuffle(buffer_size=max(n_total, 1), seed=seed).batch(batch_size)
+    train_dataset = train_dataset.shuffle(buffer_size=max(len(y_train), 1), seed=seed).batch(batch_size)
 
     model = build_cnn(augmentation=build_augmentation())
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=lr),
+        # Single sigmoid output (good=0/bad=1) -> standard binary classification loss.
         loss="binary_crossentropy",
         metrics=[
             "accuracy",
@@ -92,15 +127,17 @@ def train_detector(project_dir, epochs=50, batch_size=32, lr=3e-4, patience=10,
         epochs=epochs,
         validation_data=(X_val, y_val),
         callbacks=callbacks,
-        shuffle=False,  # already shuffled above; the dataset is pre-batched
+        # No-op for a tf.data.Dataset input either way (Keras only shuffles raw array
+        # inputs) - set explicitly just to silence the warning Keras prints about it.
+        # Actual shuffling is entirely handled by train_dataset.shuffle() above; val
+        # data is untouched by this, it's never shuffled by Keras regardless.
+        shuffle=False,
         verbose=1,
     )
 
-    save_model(model, model_path)  # belt-and-suspenders alongside ModelCheckpoint
+    save_model(model, model_path)
 
-    best_epoch = int(np.argmax(history.history["val_auc"]))
-    train_metrics = {k: float(v[best_epoch]) for k, v in history.history.items() if not k.startswith("val_")}
-    val_metrics = {k[4:]: float(v[best_epoch]) for k, v in history.history.items() if k.startswith("val_")}
+    train_metrics, val_metrics = _metrics_at_best_epoch(history)
 
     y_prob_val = model.predict(X_val, verbose=0).ravel()
     threshold_error = None
@@ -118,16 +155,16 @@ def train_detector(project_dir, epochs=50, batch_size=32, lr=3e-4, patience=10,
         print(f"WARNING: {e} Falling back to threshold=0.5.")
 
     threshold_path = project_dir / "threshold.json"
-    threshold_path.write_text(json.dumps({"threshold": threshold_info["threshold"]}, indent=2))
+    _write_json(threshold_path, {"threshold": threshold_info["threshold"]})
 
     epochs_run = len(history.history["loss"])
     metrics_path = project_dir / "metrics.json"
-    metrics_path.write_text(json.dumps({
+    _write_json(metrics_path, {
         "epochs_run": epochs_run,
         "train": train_metrics,
         "val": val_metrics,
         "threshold_search": {**threshold_info, "recall_target": recall_target, "error": threshold_error},
-    }, indent=2))
+    })
 
     return {
         "model_path": model_path,
