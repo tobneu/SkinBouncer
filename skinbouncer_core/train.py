@@ -18,10 +18,7 @@ deviations from a direct copy:
   weights, not whatever epoch training happened to stop on after `patience` more rounds.
 """
 
-import json
-import os
 import random
-import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -29,7 +26,7 @@ import tensorflow as tf
 
 from .architecture import build_cnn
 from .augmentation import build_augmentation
-from .detector_project import get_split_filepaths, load_manifest
+from .detector_project import _write_json, get_split_filepaths, load_manifest
 from .model_io import save_model
 from .preprocessing import load_images
 from .threshold import find_threshold_for_recall
@@ -62,20 +59,6 @@ def _metrics_at_best_epoch(history):
     train_metrics = {k: float(v[best_epoch]) for k, v in history.history.items() if not k.startswith("val_")}
     val_metrics = {k[4:]: float(v[best_epoch]) for k, v in history.history.items() if k.startswith("val_")}
     return train_metrics, val_metrics
-
-
-def _write_json(path, data):
-    """Write via a temp file + atomic rename, so a crash or interrupt mid-write can
-    never leave a partially-written / corrupt JSON file at `path`."""
-    path = Path(path)
-    fd, tmp_path = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w") as f:
-            json.dump(data, f, indent=2)
-        os.replace(tmp_path, path)
-    except BaseException:
-        os.unlink(tmp_path)
-        raise
 
 
 def train_detector(project_dir, epochs=50, batch_size=32, lr=3e-4, patience=10,

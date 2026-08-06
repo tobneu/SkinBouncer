@@ -34,12 +34,29 @@ image that happen to share a filename can't collide.
 """
 
 import json
+import os
 import random
+import shutil
+import tempfile
 from pathlib import Path
 
 SCHEMA_VERSION = 1
 MANIFEST_FILENAME = "split_manifest.json"
 DEFAULT_RATIOS = (0.7, 0.15, 0.15)
+
+
+def _write_json(path, data):
+    """Write via a temp file + atomic rename, so a crash or interrupt mid-write can
+    never leave a partially-written / corrupt JSON file at `path`."""
+    path = Path(path)
+    fd, tmp_path = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(data, f, indent=2)
+        os.replace(tmp_path, path)
+    except BaseException:
+        os.unlink(tmp_path)
+        raise
 
 
 def _list_images(folder):
@@ -73,6 +90,10 @@ def manifest_path(project_dir):
 
 def load_manifest(project_dir):
     return json.loads(manifest_path(project_dir).read_text())
+
+
+def save_manifest(manifest, project_dir):
+    _write_json(manifest_path(project_dir), manifest)
 
 
 def setup_detector_project(good_dir, bad_dir, project_dir, ratios=DEFAULT_RATIOS, seed=67):
@@ -115,7 +136,7 @@ def setup_detector_project(good_dir, bad_dir, project_dir, ratios=DEFAULT_RATIOS
     for name, split in bad_assignments.items():
         images[f"bad/{name}"] = {"class": "bad", "split": split}
 
-    path.write_text(json.dumps(manifest, indent=2))
+    _write_json(path, manifest)
     return manifest
 
 
@@ -131,3 +152,50 @@ def get_split_filepaths(manifest, split):
         base_dir = good_dir if info["class"] == "good" else bad_dir
         result[info["class"]].append(base_dir / filename)
     return result
+
+
+def relabel_image(manifest, project_dir, key, new_class):
+    """Move an image between good_dir/bad_dir, swap its manifest key/class, and
+    persist the manifest immediately - this is what "an active-learning round moved
+    an image between classes" (see module docstring) concretely means. `split` is
+    preserved unchanged, never re-rolled, so a relabeled image can't accidentally end
+    up in - or drop out of - the frozen test set.
+
+    Mutates `manifest` in place and returns the new key (e.g. "bad/filename.png").
+
+    Raises:
+        KeyError: `key` is not in manifest["images"].
+        ValueError: `new_class` isn't "good"/"bad", equals the image's current class
+            (callers should skip that case rather than call this as a no-op), or the
+            image's split is "test" (the frozen test set must never be touched here).
+        FileExistsError: a different image already occupies the target filename in
+            the destination directory - refuses to silently overwrite it.
+    """
+    if new_class not in ("good", "bad"):
+        raise ValueError(f'new_class must be "good" or "bad", got {new_class!r}')
+
+    info = manifest["images"][key]
+    if info["split"] == "test":
+        raise ValueError(f"refusing to relabel {key!r}: it's in the frozen test split")
+    if info["class"] == new_class:
+        raise ValueError(f"{key!r} is already class {new_class!r}")
+
+    filename = key.split("/", 1)[1]
+    good_dir = Path(manifest["good_dir"])
+    bad_dir = Path(manifest["bad_dir"])
+    old_dir = good_dir if info["class"] == "good" else bad_dir
+    new_dir = bad_dir if new_class == "bad" else good_dir
+
+    old_path = old_dir / filename
+    new_path = new_dir / filename
+    if new_path.exists():
+        raise FileExistsError(f"can't relabel {key!r}: {new_path} already exists")
+
+    shutil.move(str(old_path), str(new_path))
+
+    del manifest["images"][key]
+    new_key = f"{new_class}/{filename}"
+    manifest["images"][new_key] = {"class": new_class, "split": info["split"]}
+
+    save_manifest(manifest, project_dir)
+    return new_key

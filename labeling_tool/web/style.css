@@ -153,6 +153,30 @@ body {
   word-break: break-all;
 }
 
+.meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: -14px 0 20px;
+  flex-wrap: wrap;
+}
+
+.meta-badge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--neutral-btn);
+  color: var(--text);
+}
+
+.meta-prob {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .actions {
   display: flex;
   gap: 10px;
@@ -213,4 +237,12 @@ body {
 
 .btn-skip:hover {
   background: var(--neutral-btn-hover);
+}
+
+/* Marks whichever of Good/Bad matches the image's currently recorded class, in the
+   active-learning queue - so the user sees at a glance which click is a confirmation
+   vs. a relabel before pressing it. Unused (never applied) in the plain labeling tool. */
+.btn-current {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent) inset;
 }

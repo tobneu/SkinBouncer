@@ -1,5 +1,6 @@
-"""The js_api adapter bound into the pywebview window - the only bridge between the
-JS UI and Python. Kept intentionally thin: all real logic lives in ReviewSession.
+"""The js_api adapters bound into the pywebview window - the only bridge between the
+JS UI and Python. Kept intentionally thin: all real logic lives in the session classes
+(ReviewSession / ActiveLearningSession).
 """
 
 import base64
@@ -35,3 +36,20 @@ class LabelingAPI:
         if not self._session.is_done():
             self._session.decide(action)
         return self.get_state()
+
+
+class ActiveLearningAPI(LabelingAPI):
+    """Same js_api contract as LabelingAPI (get_state/decide), extended with the
+    ranking metadata (recorded_class/predicted_prob/reason) an ActiveLearningSession
+    tracks per item, so the UI can show the user why an image was surfaced."""
+
+    def get_state(self):
+        state = super().get_state()
+        if not state["done"]:
+            item = self._session.current_item()
+            state.update({
+                "recorded_class": item["recorded_class"],
+                "predicted_prob": item["prob"],
+                "reason": item["reason"],
+            })
+        return state
