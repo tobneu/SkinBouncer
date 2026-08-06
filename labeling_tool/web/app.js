@@ -55,10 +55,19 @@ function decide(action) {
     return;
   }
   busy = true;
-  window.pywebview.api.decide(action).then((state) => {
-    busy = false;
-    render(state);
-  });
+  window.pywebview.api
+    .decide(action)
+    .then((state) => {
+      busy = false;
+      render(state);
+    })
+    .catch((error) => {
+      // e.g. a relabel refused by the filename-collision guard in relabel_image().
+      // The session's index didn't advance server-side, so the currently shown item
+      // is still valid - just unstick input instead of leaving the app frozen.
+      busy = false;
+      alert(`Couldn't apply that decision:\n\n${error}\n\nYou can Skip this image instead.`);
+    });
 }
 
 const KEY_TO_ACTION = {

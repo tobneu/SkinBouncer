@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from PIL import Image
 
@@ -81,6 +83,14 @@ def test_session_items_have_expected_shape(tmp_path):
     assert 0.0 <= item["prob"] <= 1.0
 
 
+def test_session_raises_clear_error_if_not_a_project_dir(tmp_path):
+    not_a_project = tmp_path / "just_some_images"
+    _make_fixture_images(not_a_project, "img", 3, (0, 200, 0, 255))
+
+    with pytest.raises(FileNotFoundError, match="not a detector project directory"):
+        ActiveLearningSession(not_a_project)
+
+
 def test_session_raises_if_project_never_trained(tmp_path):
     good_dir = tmp_path / "good"
     bad_dir = tmp_path / "bad_demo"
@@ -140,3 +150,29 @@ def test_decide_rejects_unknown_action(tmp_path):
     session = ActiveLearningSession(project_dir)
     with pytest.raises(ValueError):
         session.decide("maybe")
+
+
+def test_decide_relabel_collision_leaves_session_unchanged(tmp_path):
+    # Regression test: a real run hit this via the GUI - two different images
+    # happened to share a filename across good/bad, so relabel_image's collision
+    # guard correctly refused the move. The bug was downstream (app.js never reset
+    # its "busy" flag on a rejected decide() promise, permanently freezing input).
+    # That's only safe to unstick because the session's index does NOT advance when
+    # relabel_image raises - this test locks that invariant in.
+    project_dir = _make_trained_project(tmp_path)
+    session = ActiveLearningSession(project_dir)
+    item = session.current_item()
+    old_key = item["key"]
+    filename = old_key.split("/", 1)[1]
+    new_class = "bad" if item["recorded_class"] == "good" else "good"
+
+    colliding_dir = Path(session.manifest[f"{new_class}_dir"])
+    Image.new("RGBA", (64, 64), (0, 0, 0, 255)).save(colliding_dir / filename)
+
+    with pytest.raises(FileExistsError):
+        session.decide(new_class)
+
+    assert session.index == 0
+    assert session.relabel_count == 0
+    assert session.current_item()["key"] == old_key
+    assert old_key in session.manifest["images"]

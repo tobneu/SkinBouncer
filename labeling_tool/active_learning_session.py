@@ -60,6 +60,11 @@ class ActiveLearningSession:
     def __init__(self, project_dir):
         self.project_dir = Path(project_dir)
         project_dir = self.project_dir
+        if not (project_dir / "split_manifest.json").exists():
+            raise FileNotFoundError(
+                f"{project_dir} is not a detector project directory (no split_manifest.json "
+                f"there) - run scripts/setup_detector_project.py --project-dir {project_dir} first."
+            )
         self.manifest = load_manifest(project_dir)
 
         model_path = project_dir / "model.keras"
