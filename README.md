@@ -118,6 +118,23 @@ split) are left untouched, and only images newly added to `good_dir`/`bad_dir` s
 last run get assigned - to train/val only, so the frozen test set never grows or changes.
 See `skinbouncer_core/detector_project.py` for the manifest schema and full behavior.
 
+### Train a detector
+
+Train the shared CNN on a detector project's frozen train split, validating against val:
+
+```powershell
+python scripts/train_detector.py --project-dir detector_projects/bad_demo
+```
+
+Writes `model.keras` (loadable via `skinbouncer_core.load_model`), `threshold.json`
+(`{"threshold": <float>}`, matching what the deployment service expects) and
+`metrics.json` (train/val metrics plus the threshold search result) into the project
+directory, and prints a short summary. If no recall-target threshold is reachable on the
+val split, falls back to `threshold.json` with `{"threshold": 0.5}` rather than failing
+the run - the checkpoint always gets saved regardless. See
+`skinbouncer_core/train.py` for the full training pipeline (hyperparameters, class
+weighting, callbacks).
+
 ### Labeling tool (pywebview app)
 
 A native desktop app for manually triaging a folder of images into `good`/`bad`/`skip`
