@@ -49,6 +49,9 @@ class ActiveLearningAPI(LabelingAPI):
         # whether to show the Retrain button even on the "done" screen, where
         # current_item() is None and the ranking-only fields aren't available.
         state["can_retrain"] = True
+        # None until a retrain has completed at least once this session - the
+        # comparison is only meaningful once there's a "current" round to report on.
+        state["run_comparison"] = self._session.run_comparison
         if not state["done"]:
             item = self._session.current_item()
             state.update({
@@ -59,5 +62,10 @@ class ActiveLearningAPI(LabelingAPI):
         return state
 
     def retrain(self):
+        # Starts training on a background thread and returns immediately - the
+        # frontend polls get_training_progress() instead of waiting on this call.
         self._session.retrain()
-        return self.get_state()
+        return {"status": "started"}
+
+    def get_training_progress(self):
+        return self._session.training_progress

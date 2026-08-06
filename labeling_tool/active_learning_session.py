@@ -35,9 +35,11 @@ checkpoint is" framing as a per-launch guarantee, not a per-decision one.
 """
 
 import json
+import threading
 from pathlib import Path
 
 from skinbouncer_core import (
+    compare_runs,
     get_split_filepaths,
     load_images,
     load_manifest,
@@ -87,6 +89,9 @@ class ActiveLearningSession:
         self.items = self._build_ranked_items()
         self.index = 0
         self.relabel_count = 0
+        self.training_progress = {"status": "idle"}
+        self.run_comparison = None
+        self._retrain_thread = None
 
     def _build_ranked_items(self):
         entries = []  # (key, path, recorded_class)
@@ -155,10 +160,37 @@ class ActiveLearningSession:
         right now (including any relabels made so far this session), then re-rank the
         queue against the new checkpoint. lr/patience default lower than
         train_detector's own cold-start defaults - a warm-started model converges (or
-        plateaus) faster than one starting from random init."""
-        train_detector(self.project_dir, epochs=epochs, batch_size=batch_size,
-                        lr=lr, patience=patience, warm_start=True)
-        self.model = load_model(self.project_dir / "model.keras")
-        self.threshold = json.loads((self.project_dir / "threshold.json").read_text())["threshold"]
-        self.items = self._build_ranked_items()
-        self.index = 0
+        plateaus) faster than one starting from random init.
+
+        Runs on a background thread and returns immediately - training_progress is
+        updated live (polled by the UI via ActiveLearningAPI.get_training_progress())
+        rather than this call blocking until training finishes. This sidesteps relying
+        on pywebview servicing concurrent js_api calls: every call, including this one,
+        stays fast, so there's nothing that needs to overlap."""
+        if self.training_progress.get("status") == "running":
+            raise RuntimeError("a retrain is already in progress")
+
+        self.training_progress = {"status": "running", "epoch": 0, "epochs_total": epochs, "history": {}}
+
+        def on_epoch_end(epoch, logs):
+            self.training_progress["epoch"] = epoch + 1
+            history = self.training_progress["history"]
+            for k, v in logs.items():
+                history.setdefault(k, []).append(float(v))
+
+        def worker():
+            try:
+                train_detector(self.project_dir, epochs=epochs, batch_size=batch_size,
+                                lr=lr, patience=patience, warm_start=True, on_epoch_end=on_epoch_end)
+                self.model = load_model(self.project_dir / "model.keras")
+                self.threshold = json.loads((self.project_dir / "threshold.json").read_text())["threshold"]
+                self.items = self._build_ranked_items()
+                self.index = 0
+                self.run_comparison = compare_runs(self.project_dir, n=5)
+                self.training_progress["status"] = "done"
+            except Exception as e:
+                self.training_progress["status"] = "error"
+                self.training_progress["error"] = str(e)
+
+        self._retrain_thread = threading.Thread(target=worker, daemon=True)
+        self._retrain_thread.start()

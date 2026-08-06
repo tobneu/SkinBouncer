@@ -11,6 +11,10 @@ const btnGoodEl = document.getElementById("btn-good");
 const btnBadEl = document.getElementById("btn-bad");
 const btnSkipEl = document.getElementById("btn-skip");
 const btnRetrainEl = document.getElementById("btn-retrain");
+const trainingProgressEl = document.getElementById("training-progress");
+const trainingEpochLabelEl = document.getElementById("training-epoch-label");
+const trainingChartEl = document.getElementById("training-chart");
+const runComparisonEl = document.getElementById("run-comparison");
 
 let currentState = null;
 let busy = false;
@@ -59,6 +63,77 @@ function render(state) {
       metaRowEl.classList.add("hidden");
     }
   }
+
+  // Only ActiveLearningAPI sets this key at all (null until a retrain has completed
+  // at least once this session).
+  if ("run_comparison" in state) {
+    renderRunComparison(state.run_comparison);
+  }
+}
+
+function renderRunComparison(comparison) {
+  if (!comparison) {
+    runComparisonEl.classList.add("hidden");
+    runComparisonEl.innerHTML = "";
+    return;
+  }
+  const lines = [`New val AUC: ${comparison.current.val_auc.toFixed(3)}`];
+  if (comparison.previous.length === 0) {
+    lines.push("(first recorded run for this project)");
+  } else {
+    comparison.previous.forEach((run, i) => {
+      const pct = run.pct_change == null
+        ? "n/a"
+        : `${run.pct_change >= 0 ? "+" : ""}${run.pct_change.toFixed(1)}%`;
+      lines.push(`vs ${i + 1} round${i === 0 ? "" : "s"} ago (${run.val_auc.toFixed(3)}): ${pct}`);
+    });
+  }
+  runComparisonEl.innerHTML = lines.map((line) => `<div>${line}</div>`).join("");
+  runComparisonEl.classList.remove("hidden");
+}
+
+function renderTrainingProgress(progress) {
+  trainingEpochLabelEl.textContent = `Epoch ${progress.epoch || 0} / ${progress.epochs_total || "?"}`;
+  drawTrainingChart(progress.history || {});
+}
+
+function drawTrainingChart(history) {
+  const ctx = trainingChartEl.getContext("2d");
+  const w = trainingChartEl.width;
+  const h = trainingChartEl.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const series = [
+    { data: history.auc || [], color: "#f59e0b" },
+    { data: history.val_auc || [], color: "#14b8a6" },
+  ];
+  const allValues = series.flatMap((s) => s.data);
+  if (allValues.length === 0) {
+    return;
+  }
+  const pad = 8;
+  const minV = Math.min(...allValues, 0.5);
+  const maxV = Math.max(...allValues, 1.0);
+  const range = maxV - minV || 1;
+
+  series.forEach(({ data, color }) => {
+    if (data.length === 0) {
+      return;
+    }
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    data.forEach((value, i) => {
+      const x = pad + (i / Math.max(data.length - 1, 1)) * (w - pad * 2);
+      const y = h - pad - ((value - minV) / range) * (h - pad * 2);
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    });
+    ctx.stroke();
+  });
 }
 
 function decide(action) {
@@ -93,20 +168,39 @@ function retrain() {
   busy = true;
   setControlsDisabled(true);
   btnRetrainEl.textContent = "Training…";
+  runComparisonEl.classList.add("hidden");
+  trainingProgressEl.classList.remove("hidden");
   window.pywebview.api
     .retrain()
-    .then((state) => {
-      busy = false;
-      setControlsDisabled(false);
-      btnRetrainEl.textContent = "🔄 Retrain";
-      render(state);
-    })
+    .then(pollTrainingProgress)
     .catch((error) => {
-      busy = false;
-      setControlsDisabled(false);
-      btnRetrainEl.textContent = "🔄 Retrain";
+      onRetrainSettled();
       alert(`Retrain failed:\n\n${error}`);
     });
+}
+
+function pollTrainingProgress() {
+  window.pywebview.api.get_training_progress().then((progress) => {
+    renderTrainingProgress(progress);
+    if (progress.status === "running") {
+      setTimeout(pollTrainingProgress, 750);
+    } else if (progress.status === "error") {
+      onRetrainSettled();
+      alert(`Retrain failed:\n\n${progress.error}`);
+    } else {
+      window.pywebview.api.get_state().then((state) => {
+        onRetrainSettled();
+        render(state);
+      });
+    }
+  });
+}
+
+function onRetrainSettled() {
+  busy = false;
+  setControlsDisabled(false);
+  btnRetrainEl.textContent = "🔄 Retrain";
+  trainingProgressEl.classList.add("hidden");
 }
 
 const KEY_TO_ACTION = {

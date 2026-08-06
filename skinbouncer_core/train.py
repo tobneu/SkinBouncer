@@ -20,6 +20,7 @@ deviations from a direct copy:
 
 import json
 import random
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -30,6 +31,7 @@ from .augmentation import build_augmentation
 from .detector_project import _write_json, get_split_filepaths, load_manifest
 from .model_io import load_model, save_model
 from .preprocessing import load_images
+from .run_history import append_run_history
 from .threshold import find_threshold_for_recall
 
 
@@ -72,7 +74,7 @@ def _metrics_at_best_epoch(history):
 
 
 def train_detector(project_dir, epochs=50, batch_size=32, lr=3e-4, patience=10,
-                    recall_target=None, seed=None, warm_start=False):
+                    recall_target=None, seed=None, warm_start=False, on_epoch_end=None):
     """Train a detector on a project's frozen train/val split. Writes model.keras,
     threshold.json and metrics.json into project_dir. Returns a dict describing the
     run (checkpoint/metrics paths, history, val metrics, threshold info).
@@ -82,7 +84,11 @@ def train_detector(project_dir, epochs=50, batch_size=32, lr=3e-4, patience=10,
     the active-learning queue's Retrain action. recall_target=None resolves to 0.95
     normally, or to the previous run's recall_target when warm_start is True (see
     _previous_recall_target), so an operator's earlier --recall-target choice sticks
-    across retrain rounds unless explicitly overridden."""
+    across retrain rounds unless explicitly overridden.
+
+    on_epoch_end(epoch, logs), if given, is called by Keras after every epoch with the
+    same per-epoch scalar metrics that end up in history.history - lets a caller (e.g.
+    the labeling tool's Retrain button) surface live training progress."""
     project_dir = Path(project_dir)
     manifest = load_manifest(project_dir)
     if seed is None:
@@ -123,6 +129,8 @@ def train_detector(project_dir, epochs=50, batch_size=32, lr=3e-4, patience=10,
             filepath=str(model_path), monitor="val_auc", mode="max", save_best_only=True, verbose=0
         ),
     ]
+    if on_epoch_end is not None:
+        callbacks.append(tf.keras.callbacks.LambdaCallback(on_epoch_end=on_epoch_end))
 
     history = model.fit(
         train_dataset,
@@ -160,12 +168,18 @@ def train_detector(project_dir, epochs=50, batch_size=32, lr=3e-4, patience=10,
     _write_json(threshold_path, {"threshold": threshold_info["threshold"]})
 
     epochs_run = len(history.history["loss"])
-    metrics_path = project_dir / "metrics.json"
-    _write_json(metrics_path, {
+    metrics_dict = {
         "epochs_run": epochs_run,
         "train": train_metrics,
         "val": val_metrics,
         "threshold_search": {**threshold_info, "recall_target": recall_target, "error": threshold_error},
+    }
+    metrics_path = project_dir / "metrics.json"
+    _write_json(metrics_path, metrics_dict)
+    append_run_history(project_dir, {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "warm_start": warm_start,
+        **metrics_dict,
     })
 
     return {

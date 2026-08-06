@@ -256,6 +256,38 @@ body {
   background: var(--neutral-btn-hover);
 }
 
+.training-progress {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: var(--frame-bg);
+}
+
+.training-epoch-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+#training-chart {
+  display: block;
+  width: 100%;
+  height: 120px;
+}
+
+.run-comparison {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--neutral-btn);
+  font-size: 12px;
+  color: var(--text);
+  text-align: left;
+  line-height: 1.6;
+}
+
 /* Marks whichever of Good/Bad matches the image's currently recorded class, in the
    active-learning queue - so the user sees at a glance which click is a confirmation
    vs. a relabel before pressing it. Unused (never applied) in the plain labeling tool. */

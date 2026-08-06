@@ -134,6 +134,34 @@ def test_train_detector_warm_start_explicit_recall_target_overrides_reuse(tmp_pa
     assert metrics["threshold_search"]["recall_target"] == pytest.approx(0.6)
 
 
+def test_train_detector_calls_on_epoch_end_once_per_epoch_run(tmp_path):
+    project_dir = _make_project(tmp_path)
+    calls = []
+
+    train_detector(project_dir, epochs=2, batch_size=8, on_epoch_end=lambda epoch, logs: calls.append((epoch, logs)))
+
+    assert [epoch for epoch, _ in calls] == [0, 1]
+    for _, logs in calls:
+        assert set(logs) >= {"loss", "accuracy", "precision", "recall", "auc", "val_loss", "val_auc"}
+
+
+def test_train_detector_appends_to_training_runs_history(tmp_path):
+    project_dir = _make_project(tmp_path)
+
+    train_detector(project_dir, epochs=1, batch_size=8)
+    history_path = project_dir / "training_runs.json"
+    runs = json.loads(history_path.read_text())["runs"]
+    assert len(runs) == 1
+    assert runs[0]["warm_start"] is False
+    assert "timestamp" in runs[0]
+    assert set(runs[0]["val"]) >= {"loss", "accuracy", "precision", "recall", "auc"}
+
+    train_detector(project_dir, epochs=1, batch_size=8, warm_start=True)
+    runs = json.loads(history_path.read_text())["runs"]
+    assert len(runs) == 2
+    assert runs[1]["warm_start"] is True
+
+
 def test_write_json_round_trips(tmp_path):
     path = tmp_path / "out.json"
     _write_json(path, {"threshold": 0.5})

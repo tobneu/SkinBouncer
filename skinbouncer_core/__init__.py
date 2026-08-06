@@ -11,6 +11,7 @@ from .detector_project import (
     relabel_image,
 )
 from .train import train_detector
+from .run_history import append_run_history, compare_runs
 
 __all__ = [
     "IMG_SIZE",
@@ -30,4 +31,6 @@ __all__ = [
     "get_split_filepaths",
     "relabel_image",
     "train_detector",
+    "append_run_history",
+    "compare_runs",
 ]
