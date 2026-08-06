@@ -26,7 +26,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest==8.4.2"]
+dev = ["pytest==8.4.2", "httpx2==2.9.1"]
 # GUI-only, and pulls in Qt - kept out of the base install so the deployment Docker
 # image (06_Deployment/Dockerfile, headless) doesn't need to install it.
 labeling-tool = ["pywebview[qt]==6.2.1"]
