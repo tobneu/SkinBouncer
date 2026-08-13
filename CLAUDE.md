@@ -47,4 +47,7 @@ comment saying it was changed after review feedback is noise a year from now.
   they're imported.
 - Values crossing the pywebview bridge are JSON: cast numpy scalars to plain
   `int`/`float`, and avoid JS reserved words as `js_api` method names.
-- Run `pytest` before opening a PR. There's no CI.
+- Run `pytest` before opening a PR. CI runs the same suite, but don't use it as the
+  first signal.
+- `minecraft_plugin/` is Java and builds in a container (`minecraft_plugin/build.sh`) -
+  there is no local JDK, so don't reach for `mvn` or `javac` directly.
