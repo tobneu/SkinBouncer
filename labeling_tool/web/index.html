@@ -19,12 +19,33 @@
       </div>
 
       <div class="image-frame">
-        <img id="skin-image" alt="current skin" />
+        <div id="skin-views" class="skin-views">
+          <figure class="skin-view">
+            <div class="skin-view-body">
+              <img id="skin-image" alt="current skin texture" />
+            </div>
+            <figcaption class="skin-view-label">Texture</figcaption>
+          </figure>
+          <figure class="skin-view">
+            <div class="skin-view-body">
+              <canvas id="skin-model" class="skin-canvas"></canvas>
+            </div>
+            <figcaption class="skin-view-label">Model</figcaption>
+          </figure>
+          <figure class="skin-view">
+            <div class="skin-view-body">
+              <canvas id="skin-model-layers" class="skin-canvas"></canvas>
+            </div>
+            <figcaption class="skin-view-label">With outer layer</figcaption>
+          </figure>
+        </div>
         <div id="done-message" class="done-message hidden">
           <div class="done-emoji">🎉</div>
           <div>All images reviewed!</div>
         </div>
       </div>
+
+      <div id="skin-views-hint" class="skin-views-hint">Drag either model to turn it</div>
 
       <div id="filename" class="filename"></div>
 
@@ -81,6 +102,7 @@
     </div>
   </main>
 
+  <script src="skin3d.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

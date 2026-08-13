@@ -1,4 +1,8 @@
 const imageEl = document.getElementById("skin-image");
+const skinViewsEl = document.getElementById("skin-views");
+const skinViewsHintEl = document.getElementById("skin-views-hint");
+const skinModelEl = document.getElementById("skin-model");
+const skinModelLayersEl = document.getElementById("skin-model-layers");
 const filenameEl = document.getElementById("filename");
 const progressTextEl = document.getElementById("progress-text");
 const progressFillEl = document.getElementById("progress-fill");
@@ -29,6 +33,122 @@ const exportResultEl = document.getElementById("export-result");
 let currentState = null;
 let busy = false;
 
+// A gentle three-quarter view: enough turn to read the side of a skin, enough tilt to
+// show the top of the head, without starting so far round that the face is hard to find.
+const DEFAULT_CAMERA = { yaw: Math.PI / 5, pitch: Math.PI / 9 };
+// Stops a drag from tipping past straight down/up, where the model reads as a puzzle.
+const PITCH_LIMIT = 1.2;
+const DRAG_RADIANS_PER_PIXEL = 0.011;
+
+let camera = { ...DEFAULT_CAMERA };
+let skinModel = null;
+// Advanced on every skin change. An in-flight decode compares against it before
+// painting, so holding down a key can't let an earlier skin land after a later one.
+let skinToken = 0;
+
+function showSkin(dataUri) {
+  const token = ++skinToken;
+  const image = new Image();
+
+  const settle = (model) => {
+    if (token !== skinToken) {
+      return;
+    }
+    skinModel = model;
+    // The flat texture is swapped only once the same bytes have decoded for the 3D
+    // views, so all three panels change together instead of the texture jumping ahead.
+    imageEl.src = dataUri;
+    camera = { ...DEFAULT_CAMERA };
+    drawSkinViews();
+  };
+
+  image.onload = () => settle(SkinRenderer.parse(image));
+  // A texture the renderer can't read still gets shown flat - losing the 3D views is
+  // better than losing the image under review entirely.
+  image.onerror = () => settle(null);
+  image.src = dataUri;
+}
+
+function drawSkinViews() {
+  fitCanvas(skinModelEl);
+  fitCanvas(skinModelLayersEl);
+  SkinRenderer.draw(skinModelEl, skinModel, camera, false);
+  SkinRenderer.draw(skinModelLayersEl, skinModel, camera, true);
+}
+
+/* Matches the canvas backing store to the size CSS actually gave it. The panels are
+   flexible, so a fixed width/height in the markup would render at the wrong aspect
+   ratio and get stretched to fit. */
+function fitCanvas(canvas) {
+  const ratio = Math.min(window.devicePixelRatio || 1, 2);
+  const width = Math.round(canvas.clientWidth * ratio);
+  const height = Math.round(canvas.clientHeight * ratio);
+  if (width > 0 && height > 0 && (canvas.width !== width || canvas.height !== height)) {
+    canvas.width = width;
+    canvas.height = height;
+  }
+}
+
+function attachRotation(canvas) {
+  let activePointer = null;
+  let lastX = 0;
+  let lastY = 0;
+
+  canvas.addEventListener("pointerdown", (event) => {
+    activePointer = event.pointerId;
+    lastX = event.clientX;
+    lastY = event.clientY;
+    // Without this the drag starts a text selection over the card instead.
+    event.preventDefault();
+    capture(canvas, "setPointerCapture", activePointer);
+  });
+
+  canvas.addEventListener("pointermove", (event) => {
+    if (event.pointerId !== activePointer) {
+      return;
+    }
+    camera.yaw += (event.clientX - lastX) * DRAG_RADIANS_PER_PIXEL;
+    camera.pitch = clamp(
+      camera.pitch + (event.clientY - lastY) * DRAG_RADIANS_PER_PIXEL,
+      -PITCH_LIMIT,
+      PITCH_LIMIT,
+    );
+    lastX = event.clientX;
+    lastY = event.clientY;
+    // Both canvases are redrawn from the one shared camera, so the with/without-layer
+    // pair can never drift into two different angles and stop being comparable.
+    drawSkinViews();
+  });
+
+  const release = (event) => {
+    if (event.pointerId !== activePointer) {
+      return;
+    }
+    const released = activePointer;
+    // Cleared before the capture call, not after: if releasing were to throw, an
+    // uncleared activePointer would leave the model rotating with no button held.
+    activePointer = null;
+    capture(canvas, "releasePointerCapture", released);
+  };
+  canvas.addEventListener("pointerup", release);
+  canvas.addEventListener("pointercancel", release);
+}
+
+/* Pointer capture only keeps a drag alive when it wanders off the canvas - useful, but
+   never essential. It throws if the browser doesn't consider the pointer active, so a
+   failure here must not take the surrounding handler down with it. */
+function capture(canvas, method, pointerId) {
+  try {
+    canvas[method](pointerId);
+  } catch (error) {
+    /* drag still works, it just stops tracking outside the canvas */
+  }
+}
+
+function clamp(value, low, high) {
+  return Math.min(Math.max(value, low), high);
+}
+
 function setControlsDisabled(disabled) {
   [btnGoodEl, btnBadEl, btnSkipEl, btnRetrainEl, btnExportEl].forEach((btn) => {
     btn.disabled = disabled;
@@ -53,16 +173,21 @@ function render(state) {
   btnSkipEl.classList.toggle("hidden", state.can_skip === false);
 
   if (state.done) {
-    imageEl.classList.add("hidden");
+    skinViewsEl.classList.add("hidden");
+    skinViewsHintEl.classList.add("hidden");
     doneMessageEl.classList.remove("hidden");
+    // Abandons any decode still in flight, so it can't paint over the done screen.
+    skinToken += 1;
+    skinModel = null;
     filenameEl.textContent = "";
     metaRowEl.classList.add("hidden");
     btnGoodEl.classList.remove("btn-current");
     btnBadEl.classList.remove("btn-current");
   } else {
-    imageEl.classList.remove("hidden");
+    skinViewsEl.classList.remove("hidden");
+    skinViewsHintEl.classList.remove("hidden");
     doneMessageEl.classList.add("hidden");
-    imageEl.src = state.image_data_uri;
+    showSkin(state.image_data_uri);
     filenameEl.textContent = state.filename;
 
     // recorded_class is set by both ActiveLearningAPI and BlindTestReviewAPI (not the
@@ -403,6 +528,13 @@ document.addEventListener("keydown", (event) => {
   event.preventDefault();
   decide(action);
 });
+
+attachRotation(skinModelEl);
+attachRotation(skinModelLayersEl);
+
+// The panels are flexible, so a resized window changes how many backing-store pixels
+// each canvas needs - without this they'd stay at the old size and look soft.
+window.addEventListener("resize", drawSkinViews);
 
 window.addEventListener("pywebviewready", () => {
   window.pywebview.api.get_state().then(render);
