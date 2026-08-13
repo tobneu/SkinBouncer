@@ -1,263 +1,271 @@
 # SkinBouncer
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Tests](https://github.com/tobneu/SkinBouncer/actions/workflows/test.yml/badge.svg)](https://github.com/tobneu/SkinBouncer/actions/workflows/test.yml)
 
-> A binary image classifier that flags Minecraft player skins likely to violate server rules,
-> exposed as a REST API a server-side plugin can call on player-join. Built as a CRISP-DM
-> end-to-end machine-learning project for the FH ML course.
+> Train your own Minecraft skin detectors, then serve them to your server.
+> A labeling tool, an active-learning loop, a small CNN, and a REST API a Paper plugin
+> calls on player-join — for whatever categories *your* rules actually prohibit.
 
----
+Most large Minecraft servers prohibit certain skin categories but moderate them by hand,
+after the fact. SkinBouncer is the toolkit for building an automated **warning** system:
+you label a few hundred skins, train a detector, and the API gives your moderators a risk
+score the moment a player joins.
 
-## TL;DR
+Three things it tries to be:
 
-| | |
-|---|---|
-| **Problem** | Most large Minecraft servers prohibit certain skin categories (NSFW, hate, harassment, copyrighted characters) but rely on slow, manual after-the-fact moderation. |
-| **Goal** | Give moderators an automated, real-time risk score for every incoming player skin — *a warning system, not an auto-banner*. |
-| **Data** | ~9,000 "normal" skins from a public Kaggle dataset (Mojang-API sourced) + ~1,000 "Spider-Man" skins scraped from `minecraftskins.com` as a proxy for the real prohibited classes. |
-| **Models** | Baselines: majority-class and **PCA + Logistic Regression**. Main: a small **CNN** (Keras) with custom alpha-preserving color augmentation. |
-| **Result** | CNN reaches **AUC 0.983 / PR-AUC 0.915** on a test set. At a recall target of 0.95, precision is **57.5 %** (vs. 24 % for the LogReg baseline at the same recall). |
-| **Deployment** | **FastAPI** microservice that resolves a player name/UUID, downloads the current skin from Mojang, runs inference and returns a risk score. Designed to be called from a Spigot/PaperMC plugin. |
+- **Reusable** — nothing here is specific to one category. A detector is a folder of
+  images you labeled; the pipeline is the same whichever concept you point it at.
+- **Horizontally scalable** — detectors are independent. Drop a second one next to the
+  first and the API scores every joining player against both, under separate keys.
+- **Simple** — a desktop labeling tool with a 3D skin preview, and a thin wrapper over
+  Keras that hides the parts of a training loop you shouldn't have to rewrite.
 
----
+It is a warning system, not an auto-banner. Please read [ETHICS.md](ETHICS.md) before
+pointing it at a real server — the boundaries there are the point, not boilerplate.
 
-## Why Spider-Man?
-
-The real prohibited categories on Minecraft servers (NSFW, hate symbols, political extremism)
-are out of scope for an academic project — both ethically and legally. We chose **copyrighted
-character skins, exemplified by Spider-Man**, as a proxy class that:
-
-1. Is itself prohibited on many large servers.
-2. Has a visually coherent target (red+blue suit, spider icon, eye pattern, webbing).
-3. Is cleanly scrapable from `minecraftskins.com` by keyword.
-4. **Exercises the exact same pipeline** (scraper → cleaning → CNN → threshold tuning → API)
-   that a production deployment would use for the real classes.
+![Pipeline](img.png)
 
 ---
 
-## Repository layout
+## Quickstart
 
-The repository follows the six CRISP-DM phases, one directory per phase:
+From a fresh clone to a trained detector answering HTTP requests. Roughly 10 minutes,
+most of it waiting on downloads.
 
-| Folder | Phase | Contents |
-|---|---|---|
-| `01_BusinessUnderstanding/` | 1. Business Understanding | Project motivation, scope, success criteria. |
-| `02_DataUnderstanding/` | 2. Data Understanding | Data sources, scrapers (UUID-based + keyword-based), EDA. |
-| `03_DataPreparation/` | 3. Data Preparation | Loading, normalization, stratified split, augmentation. |
-| `04_Modeling/` | 4. Modeling | CNN architecture, baseline, training, hyperparameter discussion. |
-| `05_Evaluation/` | 5. Evaluation | Metrics, threshold tuning, baseline vs. CNN comparison. |
-| `06_Deployment/` | 6. Deployment | FastAPI service, Mojang skin lookup, deployment scenario. |
-| `data/skins/` | — | Skins, split into `good_cleaned/` (class 0) and `bad/spiderman_cleaned/` (class 1). |
-| `models/` | — | Trained Keras checkpoints. |
+**Requirements:** Python 3.11+ (developed on 3.13). Installs TensorFlow, so budget ~1 GB.
+CPU-only — no GPU needed anywhere in this project.
 
----
-## Pipeline
-![img.png](img.png)
----
-
-## Key results
-
-Reported on a test set of 1,500 stratified samples (class-1 ratio ~10 %).
-
-| Model | AUC | PR-AUC | Threshold | Recall | Precision | FPR |
-|---|---|---|---|---|---|---|
-| Majority-class baseline | — | — | — | 0.000 | — | 0.000 |
-| PCA(50) + Logistic Regression | 0.942 | 0.767 | 0.104 (recall ≥ 0.95) | 0.95 | 0.24 | 31.8 % |
-| **CNN** | **0.983** | **0.915** | **0.652 (recall ≥ 0.95)** | **0.95** | **0.58** | **7.5 %** |
-
-The CNN reduces false-positive moderation work by ~76 % vs. the LogReg baseline at the same
-recall target, and more than doubles precision.
-
-Full metrics, ROC and PR curves, and the deployment recommendation are in
-[`05_Evaluation/Evaluation.ipynb`](05_Evaluation/Evaluation.ipynb).
-
----
-
-## How to run (not verified)
-
-### Requirements
-
-Python 3.10+ (we developed on 3.11), with the packages listed in `requirements.txt`, plus
-the shared `skinbouncer_core` package (installed in editable mode so notebooks, the API,
-and the labeling tool all import the same code):
-
-```powershell
-pip install -r requirements.txt
-pip install -e .
+```bash
+pip install -e ".[dev,labeling-tool]"      # or: uv sync --all-extras
 ```
 
-### Sample data (optional, for a quick trial run)
+<details>
+<summary>What the extras are for</summary>
 
-The scraper that built the original training set isn't part of this repo (see below). If
-you just want to see the pipeline run without supplying your own skins, generate a small
-local sample dataset (real skins fetched live from the public Mojang API, plus a
-synthetic demo "flagged" category — not committed to the repo, regenerate anytime):
+`labeling-tool` pulls in pywebview and Qt for the desktop GUI. It's deliberately optional
+so the deployment Docker image stays headless. `dev` adds pytest.
+</details>
 
-```powershell
-python scripts/generate_sample_data.py
+### 1. Get some skins
+
+No dataset ships with this repo. To try the pipeline without supplying your own images,
+generate a small one — real skins fetched live from the public Mojang API, plus a
+synthetic demo "flagged" category with a self-drawn marker stamped on:
+
+```bash
+python scripts/generate_sample_data.py                      # 150 per class
+python scripts/generate_sample_data.py --images-per-class 60  # faster, less accurate
 ```
 
-This creates `sample_data/good/` and `sample_data/bad_demo/` (150 images each - confirmed
-by experiment to be enough for the CNN to actually generalize, not just run). See the
-script's docstring for provenance details.
+This writes `sample_data/good/` and `sample_data/bad_demo/` (gitignored — regenerate
+anytime). Guessing usernames against Mojang is hit-or-miss, so re-running is safe and
+resumes: images already fetched are kept and counted.
 
-### Detector project setup (stratified split)
+> **This is a pipeline demo, not an accuracy demo.** At 150 images per class the CNN
+> reaches a validation AUC of about 0.6 — above chance, nowhere near the 0.983 the same
+> architecture reaches on the real ~10,000-image dataset it was tuned for, and unstable
+> enough that two runs can differ by 0.15. The synthetic marker is small and the dataset
+> is tiny; both matter. Everything downstream is real and the metrics are real — the model
+> is mediocre because the data is toy data. Point it at your own images for a detector
+> that works.
 
-Given a `good/` folder and a `bad/<category>/` folder, set up a detector project - a
-stratified 70/15/15 train/val/test split, written to a manifest that later slices
-(training, review queue, export) rely on:
+### 2. Set up a detector project
 
-```powershell
+Given a `good/` folder and a `bad/<category>/` folder, this writes a stratified 70/15/15
+train/val/test split into a manifest that everything downstream reads:
+
+```bash
 python scripts/setup_detector_project.py --good sample_data/good \
     --bad sample_data/bad_demo --project-dir detector_projects/bad_demo
 ```
 
-This writes `detector_projects/bad_demo/split_manifest.json` and prints a per-split image
-count. Re-running the same command is safe: existing assignments (including the test
-split) are left untouched, and only images newly added to `good_dir`/`bad_dir` since the
-last run get assigned - to train/val only, so the frozen test set never grows or changes.
-See `skinbouncer_core/detector_project.py` for the manifest schema and full behavior.
+The folder name of `--bad` becomes the detector's **category** — the key the API reports
+its score under. Re-running is safe: existing assignments are left alone, and images added
+since the last run go to train/val only, so the test split never grows or changes. See
+[`skinbouncer_core/detector_project.py`](skinbouncer_core/detector_project.py) for the
+manifest schema.
 
-### Train a detector
+### 3. Train
 
-Train the shared CNN on a detector project's frozen train split, validating against val:
-
-```powershell
+```bash
 python scripts/train_detector.py --project-dir detector_projects/bad_demo
 ```
 
-Writes `model.keras` (loadable via `skinbouncer_core.load_model`), `threshold.json`
-(`{"threshold": <float>}`, matching what the deployment service expects) and
-`metrics.json` (train/val metrics plus the threshold search result) into the project
-directory, and prints a short summary. If no recall-target threshold is reachable on the
-val split, falls back to `threshold.json` with `{"threshold": 0.5}` rather than failing
-the run - the checkpoint always gets saved regardless. See
-`skinbouncer_core/train.py` for the full training pipeline (hyperparameters, class
-weighting, callbacks).
+Writes `model.keras`, `threshold.json` and `metrics.json` into the project. The threshold
+is searched on the validation split for a recall target (default 0.95) — it is the knob
+that turns a model score into a moderation policy, so it is tuned and stored, not
+hardcoded. See [`skinbouncer_core/train.py`](skinbouncer_core/train.py).
 
-### Labeling tool (pywebview app)
-
-A native desktop app for manually triaging a folder of images into `good`/`bad`/`skip`
-by hand - the foundation the active-learning review queue builds on. No model/ML
-integration yet; it just walks a folder one image at a time and moves each file into
-the right subfolder as you decide, so the output is immediately usable as `--good`/
-`--bad` input to `setup_detector_project.py` above.
-
-```powershell
-python scripts/run_labeling_tool.py --folder sample_data/bad_demo
-```
-
-Opens a window with one image at a time; use the on-screen buttons or the keyboard
-shortcuts (G/→ good, B/← bad, Space/S skip). Quitting partway through and re-running
-the same command resumes with only the not-yet-reviewed images left. See
-`labeling_tool/review_session.py` for the persistence behavior.
-
-### Active-learning review queue
-
-Same app shell, but instead of a plain folder walk it ranks a trained detector
-project's train+val images by how much the current checkpoint's prediction diverges
-from each image's recorded label, and walks them in that order - so review effort goes
-where it matters most. Requires the project to already have a checkpoint (run
-`train_detector.py` above first):
-
-```powershell
-python scripts/run_active_learning_queue.py --project-dir detector_projects/bad_demo
-```
-
-Good/Bad now mean "confirm this should be labeled good/bad": pressing the button that
-matches the image's current label (highlighted) is a no-op confirmation, pressing the
-other one relabels it - moves the file between the project's `good_dir`/`bad_dir` and
-updates the manifest immediately (see `skinbouncer_core.detector_project.relabel_image`).
-Skip always just moves on without changing anything. The frozen test split is never
-loaded or shown. Each launch recomputes the full ranked queue fresh against whatever
-checkpoint currently exists - there's no cross-session memory of already-reviewed
-images. See `labeling_tool/active_learning_session.py` for the ranking formula.
-
-The Retrain button lets you fine-tune without leaving the app: it warm-starts from the
-current checkpoint (not a fresh random init) against whatever the manifest looks like
-right now, including any relabels made so far, then re-ranks the queue from the top
-against the new checkpoint. The UI disables input for the duration and shows a live
-epoch counter and a train/val AUC learning curve as training progresses, so you can see
-convergence (or a plateau) happening in real time. Once a round finishes, it shows the
-new val AUC alongside the percentage change against each of the last up to 5 previous
-rounds for that project, so it's clear whether that round actually helped - label a
-batch, hit Retrain, repeat, for as many rounds as you want.
-
-### Blind test-set review
-
-Same app shell again, but for curating the frozen test split instead of train/val: no
-model prediction, confidence, or ranking is shown anywhere, so the test set stays an
-independent ground truth for whatever export-gate metrics eventually consume it. No
-trained checkpoint is required - only a split manifest:
-
-```powershell
-python scripts/run_blind_test_review.py --project-dir detector_projects/bad_demo
-```
-
-Good/Bad mean the same confirm-or-correct thing as the active-learning queue (see
-above), applied to test-split images instead. There's no Skip in this mode - every
-image gets an explicit decision. Progress is written directly onto each test image's
-manifest entry (`"reviewed": true`), so quitting and relaunching resumes exactly where
-you left off instead of starting over - see `labeling_tool/blind_test_review_session.py`.
-
-### Reproduce the experiments
-
-1. Make sure the dataset is present under `data/skins/good_cleaned/` and
-   `data/skins/bad/spiderman_cleaned/`. The notebooks load from these paths directly.
-2. Run the notebooks in CRISP order:
-   - `01_BusinessUnderstanding/BusinessUnderstanding.ipynb` — project framing.
-   - `02_DataUnderstanding/DataUnderstanding.ipynb` — data sources + short EDA.
-   - `03_DataPreparation/DataPreparation.ipynb` — loading, splits, augmentation.
-   - `04_Modeling/Modeling.ipynb` — train the CNN and threshold tuning.
-   - `05_Evaluation/Evaluation.ipynb` — baseline vs. CNN.
-   - `06_Deployment/Deployment.ipynb` — wire up the API.
-
-All randomness is seeded (`SEED = 67`).
-
-### Run the deployment API
-
-```powershell
-cd 06_Deployment\api
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Then `POST http://localhost:8000/check/player/` with a JSON body of the form:
-
-```json
-{ "player_name": "Notch" }
-```
-
-The service downloads the current skin for the player from the Mojang API, runs inference,
-and returns a risk score and a boolean flag.
-
-### Docker deployment
-
-Build a standalone image of the API, baking in whatever detector folders currently
-exist under `06_Deployment/api/models/detectors/` (each a `<category>/model.keras` +
-`threshold.json` pair, e.g. produced by the labeling tool's export step). There's no
-runtime toggle - a detector is "enabled" simply by having been present when the image
-was built; remove its folder and rebuild to exclude it.
+### 4. Export and serve
 
 ```bash
-06_Deployment/build.sh                 # tags skinbouncer-api:latest
-06_Deployment/build.sh my-tag:v1        # or pick your own tag
+python scripts/export_detector.py --project-dir detector_projects/bad_demo
+06_Deployment/build.sh
 docker run --rm -p 8000:8000 skinbouncer-api:latest
 ```
 
-`GET http://localhost:8000/` lists which detectors are loaded; `POST /check/player/`
-works exactly as above. Runnable from anywhere - the script resolves paths relative to
-itself, not your current directory.
+Export prints the test-split confusion matrix, then copies the checkpoint and threshold
+into `06_Deployment/api/models/detectors/<category>/`, which is what the image bakes in.
+
+```bash
+curl localhost:8000/
+# {"message": "...", "detectors": ["bad_demo"]}
+
+curl -X POST localhost:8000/check/player/ \
+     -H 'Content-Type: application/json' -d '{"player_name":"Notch"}'
+# {"player_name": "Notch", "categories": {"bad_demo": {"score": 0.02, "risk": false}}}
+```
+
+If `detectors` comes back empty, nothing was exported yet — the API says so on stderr at
+startup rather than silently scoring nothing.
+
+### 5. Connect a Minecraft server
+
+```bash
+./minecraft_plugin/build.sh                     # containerized, no local JDK needed
+EULA=TRUE MC_OPS=<your-minecraft-name> \
+    docker compose -f 06_Deployment/docker-compose.demo.yml up --build
+```
+
+Starts the API and a Paper server together. On join, the plugin scores the player off the
+main thread and warns holders of `skinbouncer.notify`. The player is never told and never
+kicked. The server must run in **online mode** — the API identifies players through
+Mojang. See [`minecraft_plugin/`](minecraft_plugin/).
 
 ---
 
-## Fetching skins yourself (optional)
+## Running more than one detector
 
-### Skins by UUID (Mojang API, rate-limited)
+Detectors are independent folders, and the API loads every one it finds:
 
-See `02_DataUnderstanding/Mining/SkinsFromUuid/minecraft_skin_downloader.py`. Builds a
-resumable CSV manifest with `(uuid, skin_url, image_path, label)` and idempotently downloads
-images by file existence. Useful for fetching a single player's skin at deployment time;
-**not** practical for bulk collection due to Mojang rate limits.
+```
+06_Deployment/api/models/detectors/
+├── bad_demo/       model.keras + threshold.json
+└── hate_symbols/   model.keras + threshold.json
+```
+
+Every `/check/player/` response carries one entry per detector, each with its own score
+and its own threshold:
+
+```json
+{"categories": {"bad_demo":     {"score": 0.02, "risk": false},
+                "hate_symbols": {"score": 0.88, "risk": true}}}
+```
+
+Adding a category means running the same four steps against a different `bad/` folder.
+Nothing is registered anywhere; a detector is enabled by being present. Remove the folder
+and restart to disable it.
+
+---
+
+## The labeling tool
+
+A desktop app (pywebview) for the part that actually costs time: deciding what each image
+is. It shows the flat texture next to a **rotatable 3D model**, because a lot of skins are
+unreadable as a UV layout and obvious as a character.
+
+It runs in three modes, sharing one shell.
+
+### Triage a folder
+
+Walks a flat folder one image at a time and moves each file into `good/`, `bad/` or
+`skip/` — so its output is directly usable as `--good`/`--bad` input above.
+
+```bash
+python scripts/run_labeling_tool.py --folder sample_data/bad_demo
+```
+
+Keys: `G`/`→` good, `B`/`←` bad, `Space`/`S` skip. Quitting and re-running resumes with
+what's left.
+
+### Active-learning review queue
+
+Instead of a folder walk, ranks a trained project's train+val images by how much the
+current checkpoint disagrees with each image's recorded label, and walks them worst-first,
+so review effort goes where it changes the model.
+
+```bash
+python scripts/run_active_learning_queue.py --project-dir detector_projects/bad_demo
+```
+
+Good/Bad here mean *confirm or correct*: pressing the highlighted button is a no-op,
+pressing the other one relabels and moves the file immediately. The frozen test split is
+never shown.
+
+**Retrain** fine-tunes without leaving the app — warm-starting from the current checkpoint
+against the manifest as it now stands, with a live epoch counter and a train/val AUC curve.
+When a round finishes it shows the new val AUC against the last up to 5 rounds, so you can
+see whether the labeling you just did actually helped. Label a batch, hit Retrain, repeat.
+
+### Blind test-set review
+
+For curating the frozen test split. No prediction, confidence or ranking is shown
+anywhere, so the test set stays independent ground truth for the metrics the export gate
+reports. Needs only a manifest, no checkpoint.
+
+```bash
+python scripts/run_blind_test_review.py --project-dir detector_projects/bad_demo
+```
+
+There's no Skip — every image gets a decision. Progress is written onto each manifest
+entry, so quitting resumes exactly where you left off.
+
+---
+
+## Scope and ethics
+
+Short version: this flags, humans decide; no dataset or trained weights ship with this
+repo; the threshold is the policy and it is yours to set. The long version, including what
+this model cannot do and what to do before running it on real players, is in
+[ETHICS.md](ETHICS.md).
+
+---
+
+## How this started
+
+SkinBouncer began as a CRISP-DM end-to-end machine-learning project for an FH course, and
+the repository still carries that structure — one directory per phase, notebooks included:
+
+| Folder | Phase |
+|---|---|
+| [`01_BusinessUnderstanding/`](01_BusinessUnderstanding/) | Motivation, scope, success criteria |
+| [`02_DataUnderstanding/`](02_DataUnderstanding/) | Data sources, scrapers, EDA |
+| [`03_DataPreparation/`](03_DataPreparation/) | Loading, normalization, splits, augmentation |
+| [`04_Modeling/`](04_Modeling/) | CNN architecture, baseline, training |
+| [`05_Evaluation/`](05_Evaluation/) | Metrics, threshold tuning, baseline vs. CNN |
+| [`06_Deployment/`](06_Deployment/) | FastAPI service, Mojang lookup, Docker |
+
+The demo class was **Spider-Man skins** — an arbitrary stand-in. The categories that
+actually motivate this are things like hate imagery, and a university project has no
+business building a training set of those. Spider-Man is visually coherent, easy to
+collect, and harmless, so it exercises the pipeline without anyone having to handle the
+real material. See [ETHICS.md](ETHICS.md).
+
+Results on a 1,500-sample stratified test set (class-1 ratio ~10 %), from that original
+dataset — not reproducible from this repo, which ships no data:
+
+| Model | AUC | PR-AUC | Threshold | Recall | Precision | FPR |
+|---|---|---|---|---|---|---|
+| Majority-class baseline | — | — | — | 0.000 | — | 0.000 |
+| PCA(50) + Logistic Regression | 0.942 | 0.767 | 0.104 | 0.95 | 0.24 | 31.8 % |
+| **CNN** | **0.983** | **0.915** | **0.652** | **0.95** | **0.58** | **7.5 %** |
+
+At the same recall target, the CNN more than doubles precision, cutting false-positive
+moderation work by ~76 %. Full curves and the deployment recommendation are in
+[`05_Evaluation/Evaluation.ipynb`](05_Evaluation/Evaluation.ipynb). All randomness is
+seeded (`SEED = 67`).
+
+> **The notebooks are a record, not a runnable path.** They load from a dataset that is
+> not part of this repo. The scripted pipeline in the Quickstart is the supported route.
+
+### Fetching skins yourself
+
+[`02_DataUnderstanding/Mining/SkinsFromUuid/minecraft_skin_downloader.py`](02_DataUnderstanding/Mining/SkinsFromUuid/minecraft_skin_downloader.py)
+builds a resumable CSV manifest of `(uuid, skin_url, image_path, label)` and downloads
+idempotently. Fine for looking up individual players; not practical for bulk collection,
+because Mojang rate-limits hard. The keyword scraper used for the original Spider-Man set
+is deliberately not part of this repo.
 
 ---
 
@@ -265,58 +273,60 @@ images by file existence. Useful for fetching a single player's skin at deployme
 
 Things this project taught us, in roughly the order they hurt:
 
-- **Class imbalance + a recall target make threshold tuning the dominant lever.**
-  We spent more energy on choosing the operating point on the precision-recall curve than on
-  picking the model architecture. Once we adopted a recall-targeted threshold-search on the
-  validation set, the gap between baseline and CNN became enormous — *at the same recall*,
-  CNN precision is more than double the LogReg baseline's. The model is only half of the
-  product; the operating point is the other half.
+- **Class imbalance plus a recall target makes threshold tuning the dominant lever.** We
+  spent more energy choosing the operating point on the PR curve than picking the
+  architecture. The model is half the product; the operating point is the other half.
 
-- **The threshold is the business knob.** It is the single parameter that translates a raw
-  model output into a moderation policy. We see this as a deployment-time configuration so
-  that individual server admins can dial the system between "aggressive flagging, lots of
-  moderator review" and "conservative flagging, only obvious cases".
+- **The threshold is the business knob.** It is the one parameter translating a raw score
+  into a moderation policy, which is why it's a deployment-time value: one admin wants
+  aggressive flagging and lots of review, another wants only the obvious cases.
 
-- **First-time CNN intuition.** Coming from the MNIST CNN example, we found the architectural
-  template transferred surprisingly well to 64×64 RGBA skins, *provided* we resisted the
-  temptation to apply geometric augmentation. The UV-unwrapped texture layout means rotation /
-  flipping / cropping would destroy signal — color-space augmentation is the only safe family.
+- **Geometric augmentation destroys skins.** The MNIST CNN template transferred
+  surprisingly well to 64×64 RGBA skins, *provided* we resisted rotation, flipping and
+  cropping — a UV-unwrapped texture has no translation invariance to exploit. Color-space
+  augmentation is the only safe family.
 
-- **Alpha-as-mask matters.** The alpha channel of a Minecraft skin is structural, not
-  cosmetic. We kept all four RGBA channels and wrote a custom `RandomColorShift` layer that
-  perturbs only RGB while preserving alpha. This was non-obvious early on and would have
-  silently hurt the model if we'd dropped the channel or shifted it uniformly with the others.
+- **Alpha is structural, not cosmetic.** We kept all four RGBA channels and wrote a
+  `RandomColorShift` layer perturbing only RGB. Dropping the channel, or shifting it with
+  the others, would have quietly hurt the model.
 
-- **Manual cleaning false-positives are a self-validation signal.** When the CNN's strongest
-  false positives on the "normal" class turned out to be *real* Spider-Man skins that had
-  slipped into the Kaggle sample, that was a vote of confidence in the model — it was learning
-  the right concept, not noise. Those cases were moved across folders before retraining,
-  closing the active-learning loop by hand.
+- **Cleaning false-positives is a self-validation signal.** When the CNN's strongest false
+  positives on the "normal" class turned out to be *real* Spider-Man skins that had slipped
+  into the source dataset, that was a vote of confidence — it was learning the concept, not
+  noise. Closing that loop by hand is what the active-learning queue automates.
 
-- **Mojang rate-limiting drove a real engineering decision.** The original plan to harvest
-  skins from a 51-million-UUID list collapsed under the API rate limit; we pivoted to a Kaggle
-  dataset that someone else had paid the rate-limit cost for. The UUID-based downloader still
-  earns its keep at *deployment* time, where the per-request rate is negligible.
+- **Rate-limiting drove a real engineering decision.** Harvesting from a 51-million-UUID
+  list collapsed under Mojang's rate limit; we pivoted to a Kaggle dataset someone else had
+  already paid that cost for. The UUID downloader still earns its keep at *deployment*
+  time, where the per-request rate is negligible.
 
 ---
 
 ## Future work
 
-- **Train on actual prohibited classes** (NSFW, hate symbols, political extremism). The
-  pipeline is unchanged; only the keyword list and the cleaning pass need adapting. This is
-  the productization step the project was designed to enable.
-- **Multi-class / multi-label classification** with a classifier per prohibited concept type,
-  or a single shared multiclass model with multiple output heads.
-- **Online / continual learning from moderator feedback.** Every time a moderator overturns or
-  confirms a flag in production, that becomes a labeled example. Feed it back, retrain
-  incrementally, watch the threshold drift.
-- **Open-source release** as a moderator dev-kit: a scraper + training notebook + API
-  template that any server operator can run on their own banned-player data to fine-tune the
-  model for their own server's policy.
-- **Adversarial robustness.** Once the system is known to exist, players will try to evade it
-  by changing skins slighty.
-- **Region-based CNN** that exploits the fixed UV layout by classifying head / torso / arms /
-  legs separately and combining the outputs. An obvious experiment we did not run.
+- **Multi-label classification** — one head per prohibited concept instead of one model
+  per category, sharing a trunk.
+- **A `/check/skin` endpoint** taking a texture URL or PNG directly. A plugin already has
+  the texture from the player's profile, so this would drop two Mojang round-trips per join
+  and work on offline-mode servers.
+- **Online learning from moderator feedback.** Every overturned or confirmed flag is a
+  labeled example. Feed it back, retrain incrementally, watch the threshold drift.
+- **Adversarial robustness.** Once the system is known to exist, players will try slight
+  skin edits to evade it.
+- **Region-based CNN** exploiting the fixed UV layout — classify head / torso / arms / legs
+  separately and combine. An obvious experiment we did not run.
+- **ONNX export**, so inference doesn't require the exact TensorFlow version the
+  `.keras` checkpoint was written with.
+
+---
+
+## Contributing
+
+`pytest` before opening a PR. [TESTING.md](TESTING.md) explains the testing strategy per
+component — including how to verify the GUI offscreen instead of opening a window.
+
+Layout: `skinbouncer_core/` is importable library code, `labeling_tool/` is the GUI,
+`scripts/` holds thin CLI wrappers, `minecraft_plugin/` is the Paper plugin.
 
 ---
 
@@ -325,10 +335,13 @@ Things this project taught us, in roughly the order they hurt:
 - **Skin dataset:** [Sha2048's Minecraft Skin Dataset](https://www.kaggle.com/datasets/sha2048/minecraft-skin-dataset) on Kaggle.
 - **UUID list (initial attempt):** [matdoes.dev / minecraft-uuids](https://matdoes.dev/minecraft-uuids).
 - **Keyword-scraped Spider-Man / military / bikini / WW2 skins:** [`minecraftskins.com`](https://www.minecraftskins.com).
-- **Mojang APIs** for runtime skin lookup at deployment time. [Docs](https://minecraft.wiki/w/Mojang_API#Query_player's_UUID)
+- **Mojang APIs** for runtime skin lookup. [Docs](https://minecraft.wiki/w/Mojang_API#Query_player's_UUID)
 - **Minecraft Skin Wiki** for the UV-mapping reference: https://minecraft.wiki/w/Skin
-- CNN architecture adapted from the an MNIST CNN example notebook. 
+- **CNN architecture** adapted from *CNN for MNIST Classification* by Abbas Rahem Abdulhamza,
+  published on Kaggle. A copy is kept at
+  [`04_Modeling/cnn-for-mnist-classification.ipynb`](04_Modeling/cnn-for-mnist-classification.ipynb)
+  for reference; it is the original author's work, not ours, and no license was stated on it.
 
-This project was developed for the FH machine-learning course; per the course rules, any
+This project was developed for an FH machine-learning course; per the course rules, any
 code originating from LLMs or other sources is the responsibility of the authors. The
 notebooks have been read, understood, and edited by us.

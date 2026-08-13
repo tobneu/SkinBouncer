@@ -2,13 +2,16 @@
 
 ## Running tests
 
-```powershell
+```bash
 pip install -e ".[dev]"
 pytest
 ```
 
-All tests live under `tests/` and use `pytest`. There's no CI configured yet, so run
-this locally before opening a PR.
+Or, using the lockfile that ships with the repo: `uv sync --all-extras && uv run pytest`.
+
+All tests live under `tests/` and use `pytest`. CI runs the same suite on 3.11 and 3.13
+(`.github/workflows/test.yml`), but run it locally before opening a PR - the suite is
+fast enough that waiting on CI to find out is a worse loop.
 
 ## Philosophy
 

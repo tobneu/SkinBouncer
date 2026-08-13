@@ -1,0 +1,31 @@
+name: Tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor declared in pyproject.toml, and the version development happens on.
+        python-version: ["3.11", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      # No labeling-tool extra: it pulls in Qt for the desktop GUI, and the tests reach
+      # the code behind the pywebview bridge directly rather than through a window
+      # (see TESTING.md).
+      - run: pip install -e ".[dev]"
+
+      - run: pytest -q

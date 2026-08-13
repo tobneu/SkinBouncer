@@ -1,8 +1,12 @@
 """Exercises the FastAPI app in 06_Deployment/api/main.py the same way it's run in
 the deployment image: main.py imported with 06_Deployment/api on sys.path (so its
 bare `import minecraft_skin_downloader` resolves), and its module-level `detectors`
-dict built from whatever `./models/detectors` looks like relative to the process cwd
-at import time. Network calls to Mojang are stubbed out so these run offline.
+dict built at import time from the folder SKINBOUNCER_DETECTORS_DIR points at.
+
+Setting that env var is what keeps these tests off the repo's own
+06_Deployment/api/models/detectors - main.py otherwise resolves the folder relative
+to its own location, which in a source checkout is the maintainer's real exports.
+Network calls to Mojang are stubbed out so these run offline.
 """
 
 import importlib.util
@@ -57,11 +61,17 @@ def _stub_downloader(monkeypatch, module):
     )
 
 
+def _point_at_detectors(monkeypatch, detectors_dir):
+    """main.py reads SKINBOUNCER_DETECTORS_DIR at import time, so this has to happen
+    before _import_main()."""
+    monkeypatch.setenv("SKINBOUNCER_DETECTORS_DIR", str(detectors_dir))
+
+
 @pytest.fixture
 def client(monkeypatch, tmp_path):
-    # No ./models/detectors under here, so this mirrors a build with zero exported
+    # Points at a folder that doesn't exist, mirroring a build with zero exported
     # detectors (build.sh's default state for a fresh clone).
-    monkeypatch.chdir(tmp_path)
+    _point_at_detectors(monkeypatch, tmp_path / "models" / "detectors")
     module = _import_main("deployment_api_main")
     _stub_downloader(monkeypatch, module)
     return TestClient(module.app)
@@ -113,6 +123,59 @@ def test_check_player_requires_player_name_field(client):
     assert res.status_code == 422
 
 
+def test_check_player_rejects_empty_name_without_an_id(client):
+    """player_id defaults to None rather than "", so an empty name on its own has to be
+    caught by the same guard - otherwise it falls through into a Mojang lookup for the
+    empty string."""
+    res = client.post("/check/player/", json={"player_name": ""})
+    _print_response("POST /check/player/ (empty name, no id)", res)
+
+    assert res.status_code == 400
+
+
+def test_check_player_returns_404_when_the_skin_cannot_be_fetched(monkeypatch, tmp_path):
+    """The downloader reports every failure - unknown player, default Steve/Alex skin,
+    Mojang unreachable - by returning False without writing the file. Scoring the file
+    anyway turns all of them into a 500 traceback."""
+    _point_at_detectors(monkeypatch, tmp_path / "models" / "detectors")
+    module = _import_main("deployment_api_main_download_fails")
+    monkeypatch.setattr(
+        module.MinecraftSkinDownloader,
+        "download_by_name",
+        lambda self, player_name, output_path: False,
+    )
+    client = TestClient(module.app)
+
+    res = client.post("/check/player/", json={"player_name": "NoSuchPlayer"})
+    _print_response("POST /check/player/ (download fails)", res)
+
+    assert res.status_code == 404
+    assert "NoSuchPlayer" in res.json()["detail"]
+
+
+def test_check_player_does_not_keep_the_downloaded_skin(monkeypatch, tmp_path):
+    """Every checked skin used to be written to a cwd-relative folder keyed by the
+    request's player_name and left there, so a long-lived server grew without bound and
+    a name like "../../x" escaped the folder."""
+    _point_at_detectors(monkeypatch, tmp_path / "models" / "detectors")
+    module = _import_main("deployment_api_main_no_leftovers")
+    written = []
+
+    def record_and_download(self, player_name, output_path):
+        written.append(Path(output_path))
+        return _fake_download(output_path)
+
+    monkeypatch.setattr(module.MinecraftSkinDownloader, "download_by_name", record_and_download)
+    client = TestClient(module.app)
+
+    res = client.post("/check/player/", json={"player_name": "../../escaped"})
+
+    assert res.status_code == 200
+    assert len(written) == 1
+    assert not written[0].exists()
+    assert not written[0].parent.exists()
+
+
 def _make_fixture_images(folder, prefix, n, color):
     folder.mkdir(parents=True, exist_ok=True)
     for i in range(n):
@@ -122,7 +185,7 @@ def _make_fixture_images(folder, prefix, n, color):
 def test_check_player_returns_scores_for_a_configured_detector(monkeypatch, tmp_path):
     # Same layout load_detectors() expects: ./models/detectors/<category>/{model.keras,
     # threshold.json}, built via the same train_detector() the labeling tool uses.
-    monkeypatch.chdir(tmp_path)
+    _point_at_detectors(monkeypatch, tmp_path / "models" / "detectors")
     good_dir = tmp_path / "_src_good"
     bad_dir = tmp_path / "_src_bad"
     _make_fixture_images(good_dir, "good", 16, (0, 200, 0, 255))
@@ -152,7 +215,7 @@ def test_api_loads_and_scores_a_detector_produced_by_export_detector(monkeypatch
     those two agree on the layout, filenames and threshold format - a change to either
     side alone would otherwise only surface as a silently detector-less deployment.
     """
-    monkeypatch.chdir(tmp_path)
+    _point_at_detectors(monkeypatch, tmp_path / "models" / "detectors")
     good_dir = tmp_path / "_src_good"
     bad_dir = tmp_path / "hate_spiders"
     _make_fixture_images(good_dir, "good", 16, (0, 200, 0, 255))

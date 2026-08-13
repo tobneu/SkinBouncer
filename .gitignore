@@ -82,6 +82,12 @@ models/
 *.onnx
 
 # ----------------------------
+# Minecraft plugin build (containerized, see minecraft_plugin/build.sh)
+# ----------------------------
+minecraft_plugin/target/
+minecraft_plugin/.m2/
+
+# ----------------------------
 # Generated data
 # ----------------------------
 data/
