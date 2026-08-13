@@ -449,6 +449,69 @@ body {
   margin-top: 8px;
 }
 
+/* Plain-language restatement of recall/precision, sitting between the headline and the
+   grid - the grid alone answers "how many of each kind of mistake", these two lines
+   answer "how good is it at the job" without naming a single metric. */
+.test-rates {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.test-rate {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.test-rate .test-rate-value {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.test-rate .test-rate-detail {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+/* Warning tint rather than the muted caption treatment: an uncurated test set means
+   every number above it is only as good as the original bulk sort, which the operator
+   needs to notice before exporting, not read past. */
+.curation-note {
+  font-size: 11px;
+  margin-top: 8px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: var(--bad-tint);
+}
+
+.btn-export {
+  width: 100%;
+  margin-top: 10px;
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.export-result {
+  font-size: 11px;
+  margin-top: 8px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: var(--good-tint);
+  text-align: left;
+  word-break: break-all;
+}
+
+.export-result.failed {
+  background: var(--bad-tint);
+}
+
 /* Marks whichever of Good/Bad matches the image's currently recorded class, in the
    active-learning queue - so the user sees at a glance which click is a confirmation
    vs. a relabel before pressing it. Unused (never applied) in the plain labeling tool. */

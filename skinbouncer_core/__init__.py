@@ -12,7 +12,8 @@ from .detector_project import (
 )
 from .train import train_detector
 from .run_history import append_run_history, compare_runs
-from .evaluation import evaluate_confusion_matrix
+from .evaluation import curation_status, evaluate_confusion_matrix
+from .export import DEFAULT_DETECTORS_DIR, export_detector
 
 __all__ = [
     "IMG_SIZE",
@@ -35,4 +36,7 @@ __all__ = [
     "append_run_history",
     "compare_runs",
     "evaluate_confusion_matrix",
+    "curation_status",
+    "DEFAULT_DETECTORS_DIR",
+    "export_detector",
 ]

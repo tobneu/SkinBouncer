@@ -1,9 +1,15 @@
+import json
 from pathlib import Path
 
 import pytest
 from PIL import Image
 
-from skinbouncer_core import evaluate_confusion_matrix, setup_detector_project, train_detector
+from skinbouncer_core import (
+    curation_status,
+    evaluate_confusion_matrix,
+    setup_detector_project,
+    train_detector,
+)
 from labeling_tool.active_learning_session import ActiveLearningSession, _reason, _suspicion
 
 
@@ -88,8 +94,55 @@ def test_session_has_confusion_matrix_after_init(tmp_path):
     session = ActiveLearningSession(project_dir)
 
     assert session.confusion_matrix is not None
-    assert set(session.confusion_matrix) == {"tp", "tn", "fp", "fn", "n"}
+    assert set(session.confusion_matrix) >= {"tp", "tn", "fp", "fn", "n"}
     assert session.confusion_matrix["n"] > 0
+
+
+def test_session_reports_test_curation_status(tmp_path):
+    project_dir = _make_trained_project(tmp_path)
+    session = ActiveLearningSession(project_dir)
+
+    assert session.test_curation == curation_status(session.manifest)
+    # Nothing has been through blind review in a freshly set-up project.
+    assert session.test_curation["reviewed"] == 0
+    assert session.test_curation["complete"] is False
+
+
+def test_export_publishes_the_current_checkpoint_and_threshold(tmp_path):
+    project_dir = _make_trained_project(tmp_path)
+    session = ActiveLearningSession(project_dir)
+    detectors_dir = tmp_path / "detectors"
+
+    result = session.export(detectors_dir=detectors_dir)
+
+    dest = detectors_dir / session.manifest["category"]
+    assert (dest / "model.keras").read_bytes() == (project_dir / "model.keras").read_bytes()
+    assert json.loads((dest / "threshold.json").read_text())["threshold"] == session.threshold
+    assert result["dest_dir"] == str(dest)
+
+
+def test_export_is_not_blocked_by_an_uncurated_test_set(tmp_path):
+    # Deliberate: curation state is reported alongside the metrics for the operator to
+    # weigh, it does not gate the action itself.
+    project_dir = _make_trained_project(tmp_path)
+    session = ActiveLearningSession(project_dir)
+    assert session.test_curation["complete"] is False
+
+    result = session.export(detectors_dir=tmp_path / "detectors")
+
+    assert Path(result["model_path"]).exists()
+
+
+def test_export_after_retrain_publishes_the_new_checkpoint(tmp_path):
+    project_dir = _make_trained_project(tmp_path)
+    session = ActiveLearningSession(project_dir)
+
+    session.retrain(epochs=1, batch_size=8)
+    session._retrain_thread.join()
+    result = session.export(detectors_dir=tmp_path / "detectors")
+
+    assert Path(result["model_path"]).read_bytes() == (project_dir / "model.keras").read_bytes()
+    assert result["threshold"] == session.threshold
 
 
 def test_session_raises_clear_error_if_not_a_project_dir(tmp_path):

@@ -44,7 +44,9 @@ from pathlib import Path
 
 from skinbouncer_core import (
     compare_runs,
+    curation_status,
     evaluate_confusion_matrix,
+    export_detector,
     get_split_filepaths,
     load_images,
     load_manifest,
@@ -91,6 +93,7 @@ class ActiveLearningSession:
         self.model = load_model(model_path)
         self.threshold = json.loads(threshold_path.read_text())["threshold"]
         self.confusion_matrix = evaluate_confusion_matrix(self.manifest, self.model, self.threshold)
+        self.test_curation = curation_status(self.manifest)
 
         self.items = self._build_ranked_items()
         self.index = 0
@@ -201,3 +204,15 @@ class ActiveLearningSession:
 
         self._retrain_thread = threading.Thread(target=worker, daemon=True)
         self._retrain_thread.start()
+
+    def export(self, detectors_dir=None):
+        """Publish the current checkpoint + tuned threshold to the deployment
+        detectors folder, making it the version the next image build ships.
+
+        Deliberately not blocked on test_curation being complete: the curation state
+        is reported alongside the test metrics so the operator can weigh it, but an
+        uncurated test set makes those metrics unvetted, not the checkpoint itself
+        unexportable. Export is also cheap and repeatable - re-exporting after
+        finishing curation costs nothing.
+        """
+        return export_detector(self.project_dir, detectors_dir=detectors_dir)

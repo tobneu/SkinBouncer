@@ -59,6 +59,7 @@
 
       <div id="confusion-matrix" class="confusion-matrix hidden">
         <div id="confusion-matrix-headline" class="confusion-matrix-headline"></div>
+        <div id="test-rates" class="test-rates"></div>
         <div class="confusion-matrix-grid">
           <div class="cm-corner"></div>
           <div class="cm-axis-label">Predicted good</div>
@@ -71,9 +72,12 @@
           <div id="cm-tp" class="confusion-matrix-cell correct"></div>
         </div>
         <div class="confusion-matrix-caption">Measured on test images the model never trained or tuned on.</div>
+        <div id="curation-note" class="curation-note hidden"></div>
       </div>
 
       <button id="btn-retrain" class="btn btn-retrain hidden" onclick="retrain()">🔄 Retrain</button>
+      <button id="btn-export" class="btn btn-export hidden" onclick="exportDetector()">📦 Export detector</button>
+      <div id="export-result" class="export-result hidden"></div>
     </div>
   </main>
 

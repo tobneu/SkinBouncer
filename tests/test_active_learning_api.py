@@ -16,6 +16,8 @@ class _StubSession:
         self.training_progress = {"status": "idle"}
         self.run_comparison = None
         self.confusion_matrix = None
+        self.test_curation = {"reviewed": 0, "total": 0, "complete": False}
+        self.export_calls = []
 
     def total(self):
         return len(self.items)
@@ -40,6 +42,13 @@ class _StubSession:
     def retrain(self):
         self.retrain_calls += 1
         self.index = 0
+
+    def export(self):
+        self.export_calls.append(True)
+        return {"category": "bad_demo", "dest_dir": "/somewhere/detectors/bad_demo",
+                "model_path": "/somewhere/detectors/bad_demo/model.keras",
+                "threshold_path": "/somewhere/detectors/bad_demo/threshold.json",
+                "threshold": 0.42}
 
 
 def _fake_png(tmp_path, name):
@@ -68,6 +77,7 @@ def test_get_state_includes_ranking_metadata(tmp_path):
     assert state["predicted_prob"] == 0.87
     assert state["reason"] == "model disagrees"
     assert state["can_retrain"] is True
+    assert state["can_export"] is True
     assert state["run_comparison"] is None
 
 
@@ -78,7 +88,10 @@ def test_get_state_done_has_no_ranking_metadata(tmp_path):
     assert "recorded_class" not in state
     assert "predicted_prob" not in state
     assert "reason" not in state
+    # Both stay available on the done screen - that's where an operator who just
+    # finished a review round reaches for them.
     assert state["can_retrain"] is True
+    assert state["can_export"] is True
 
 
 def test_get_state_reflects_session_run_comparison(tmp_path):
@@ -99,6 +112,27 @@ def test_get_state_reflects_session_confusion_matrix(tmp_path):
     state = api.get_state()
 
     assert state["confusion_matrix"] == session.confusion_matrix
+
+
+def test_get_state_reflects_session_test_curation(tmp_path):
+    session = _StubSession([])
+    session.test_curation = {"reviewed": 29, "total": 1500, "complete": False}
+    api = ActiveLearningAPI(session)
+
+    state = api.get_state()
+
+    assert state["test_curation"] == session.test_curation
+
+
+def test_export_detector_forwards_to_the_session_and_returns_its_result(tmp_path):
+    session = _StubSession([])
+    api = ActiveLearningAPI(session)
+
+    result = api.export_detector()
+
+    assert session.export_calls == [True]
+    assert result["category"] == "bad_demo"
+    assert result["threshold"] == 0.42
 
 
 def test_retrain_starts_training_and_returns_ack(tmp_path):
