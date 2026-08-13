@@ -1,0 +1,52 @@
+# Local end-to-end demo: the detector API and a Paper server with the SkinBouncer plugin
+# on one network, so the plugin reaches the API as plain "api" with no host networking.
+#
+#   ./minecraft_plugin/build.sh
+#   EULA=TRUE MC_OPS=<your-minecraft-name> \
+#       docker compose -f 06_Deployment/docker-compose.demo.yml up --build
+#
+# ONLINE_MODE is on because the API identifies players through Mojang - an offline-mode
+# server hands out UUIDs Mojang has never seen, and every lookup would come back 404.
+name: skinbouncer-demo
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: 06_Deployment/Dockerfile
+    environment:
+      # Mounted rather than baked in, so re-exporting a detector and restarting this
+      # container is enough - no image rebuild between training rounds.
+      SKINBOUNCER_DETECTORS_DIR: /detectors
+    volumes:
+      - ./api/models/detectors:/detectors:ro
+    ports:
+      - "8000:8000"
+
+  minecraft:
+    image: itzg/minecraft-server:latest
+    depends_on:
+      - api
+    tty: true
+    stdin_open: true
+    ports:
+      - "25565:25565"
+    environment:
+      # Deliberately not defaulted: running a server means accepting Mojang's EULA.
+      EULA: "${EULA:?set EULA=TRUE to accept https://aka.ms/MinecraftEULA}"
+      MC_OPS: "${MC_OPS:?set MC_OPS to your Minecraft name so you can see staff warnings}"
+      TYPE: PAPER
+      # Pinned rather than "latest" so the server and the API the plugin is compiled
+      # against (minecraft_plugin/pom.xml) can't drift apart on a rebuild.
+      VERSION: "26.2"
+      ONLINE_MODE: "TRUE"
+      MEMORY: 2G
+      OPS: "${MC_OPS}"
+    volumes:
+      - minecraft-data:/data
+      # itzg/minecraft-server copies anything under /plugins into the server's plugin
+      # folder on start, so a rebuilt jar is picked up by restarting this service.
+      - ../minecraft_plugin/target/SkinBouncer.jar:/plugins/SkinBouncer.jar:ro
+
+volumes:
+  minecraft-data:

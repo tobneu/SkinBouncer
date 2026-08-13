@@ -1,0 +1,12 @@
+name: SkinBouncer
+version: '${project.version}'
+main: dev.tobneu.skinbouncer.SkinBouncerPlugin
+api-version: '26.2'
+description: Scores joining players' skins against a SkinBouncer detector API and warns staff.
+author: tobneu
+website: https://github.com/tobneu/SkinBouncer
+
+permissions:
+  skinbouncer.notify:
+    description: Receives in-game warnings when a joining player's skin is flagged.
+    default: op
