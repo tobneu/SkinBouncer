@@ -1,7 +1,13 @@
 import pytest
 from PIL import Image
 
-from skinbouncer_core import load_manifest, relabel_image, save_manifest, setup_detector_project
+from skinbouncer_core import (
+    load_manifest,
+    project_display_name,
+    relabel_image,
+    save_manifest,
+    setup_detector_project,
+)
 
 
 def _make_fixture_images(folder, prefix, n, color):
@@ -19,6 +25,38 @@ def _make_project(tmp_path, n_good=10, n_bad=10, ratios=(1.0, 0.0, 0.0)):
     project_dir = tmp_path / "project"
     manifest = setup_detector_project(good_dir, bad_dir, project_dir, ratios=ratios)
     return project_dir, manifest
+
+
+def test_setup_detector_project_without_name_has_no_name_key(tmp_path):
+    _, manifest = _make_project(tmp_path)
+    assert "name" not in manifest
+
+
+def test_setup_detector_project_stores_given_name(tmp_path):
+    good_dir = tmp_path / "good"
+    bad_dir = tmp_path / "bad_demo"
+    _make_fixture_images(good_dir, "good", 10, (0, 200, 0, 255))
+    _make_fixture_images(bad_dir, "bad", 10, (200, 0, 0, 255))
+
+    manifest = setup_detector_project(good_dir, bad_dir, tmp_path / "project", name="Hate Symbols")
+    assert manifest["name"] == "Hate Symbols"
+    assert load_manifest(tmp_path / "project")["name"] == "Hate Symbols"
+
+
+def test_project_display_name_prefers_explicit_name(tmp_path):
+    manifest = {"name": "Hate Symbols", "category": "bad_demo"}
+    assert project_display_name(manifest, tmp_path / "whatever") == "Hate Symbols"
+
+
+def test_project_display_name_falls_back_to_category(tmp_path):
+    manifest = {"category": "spiderman"}
+    assert project_display_name(manifest, tmp_path / "hate_spiders_1") == "spiderman"
+
+
+def test_project_display_name_falls_back_to_folder_name(tmp_path):
+    manifest = {}
+    project_dir = tmp_path / "bad_demo"
+    assert project_display_name(manifest, project_dir) == "bad_demo"
 
 
 def test_save_manifest_round_trips(tmp_path):

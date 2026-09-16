@@ -4,7 +4,10 @@ JS UI and Python. Kept intentionally thin: all real logic lives in the session c
 """
 
 import base64
+from pathlib import Path
 
+from .active_learning_session import ActiveLearningSession
+from .overview_session import ProjectOverviewSession
 from .settings import DEFAULT_SETTINGS_PATH, load_theme, save_theme
 
 
@@ -115,3 +118,97 @@ class BlindTestReviewAPI(LabelingAPI):
         if not state["done"]:
             state["recorded_class"] = self._session.current_item()["recorded_class"]
         return state
+
+
+class SkinBouncerAPI:
+    """js_api for the single long-lived project-overview window (scripts/run_skinbouncer.py).
+    Wraps a ProjectOverviewSession plus, once a project is open, an ActiveLearningAPI it
+    delegates review/retrain/export calls to - get_state()'s "screen" field is what tells
+    the frontend which of the two modes it's currently looking at.
+
+    Not a LabelingAPI subclass: LabelingAPI is built around one fixed session handed in
+    at construction, whereas this API's "current project" changes over the window's
+    lifetime as projects are opened and closed.
+    """
+
+    def __init__(self, projects_root, settings_path=DEFAULT_SETTINGS_PATH):
+        self._overview = ProjectOverviewSession(projects_root)
+        self._project_api = None
+        self._settings_path = settings_path
+        # Set by the entrypoint script right after webview.create_window() - js_api is
+        # bound at construction time, but nothing stops attaching the Window afterward.
+        self.window = None
+
+    def get_settings(self):
+        return {"theme": load_theme(self._settings_path)}
+
+    def set_theme(self, theme):
+        save_theme(theme, self._settings_path)
+        return {"status": "ok"}
+
+    def _open(self, project_dir):
+        session = ActiveLearningSession(project_dir)
+        self._project_api = ActiveLearningAPI(session, settings_path=self._settings_path)
+
+    def _maybe_finish_training(self):
+        """Cold-start training (wizard or auto-train-on-open) has no session to attach
+        to until it succeeds - this is where that session finally gets constructed,
+        the moment a caller next asks for state or progress after training finished."""
+        if self._project_api is None and self._overview.trained_project_dir is not None:
+            self._open(self._overview.trained_project_dir)
+            self._overview.trained_project_dir = None
+
+    def get_state(self):
+        self._maybe_finish_training()
+        if self._project_api is not None:
+            state = self._project_api.get_state()
+            state["screen"] = "review"
+            return state
+        return {"screen": "overview", "projects": self._overview.list_projects()}
+
+    def get_training_progress(self):
+        self._maybe_finish_training()
+        if self._project_api is not None:
+            return self._project_api.get_training_progress()
+        return self._overview.training_progress
+
+    def pick_folder(self):
+        # Local import: importing this module must not require the labeling-tool
+        # extra (pywebview) to be installed - only actually reaching this method
+        # (from inside a real GUI session) should. See labeling_tool/app.py and
+        # friends for the same lazy-import reasoning applied to whole modules.
+        import webview
+
+        result = self.window.create_file_dialog(webview.FileDialog.FOLDER)
+        return {"path": result[0] if result else None}
+
+    def create_project(self, name, good_dir, bad_dir):
+        try:
+            self._overview.create_project(name, good_dir, bad_dir)
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+        return {"status": "started"}
+
+    def open_project(self, project_dir):
+        project_dir = Path(project_dir)
+        if (project_dir / "model.keras").exists() and (project_dir / "threshold.json").exists():
+            self._open(project_dir)
+            return {"status": "ok"}
+        try:
+            self._overview.train_existing(project_dir)
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+        return {"status": "started"}
+
+    def close_project(self):
+        self._project_api = None
+        return self.get_state()
+
+    def decide(self, action):
+        return self._project_api.decide(action)
+
+    def retrain(self):
+        return self._project_api.retrain()
+
+    def export_detector(self):
+        return self._project_api.export_detector()

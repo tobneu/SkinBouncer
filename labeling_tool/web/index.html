@@ -9,11 +9,68 @@
   <header class="topbar">
     <span class="logo">🛡️ SkinBouncer</span>
     <span class="subtitle">Labeling Tool</span>
+    <button id="back-to-overview" class="back-link hidden" onclick="backToOverview()">← All projects</button>
     <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()"
             aria-label="Toggle light/dark theme" title="Toggle light/dark theme">🌙</button>
   </header>
 
-  <main class="stage">
+  <main id="screen-overview" class="stage hidden">
+    <div class="card overview-card">
+      <div class="overview-header">
+        <h1 class="overview-title">Detector projects</h1>
+        <button id="btn-new-project" class="btn btn-new-project" onclick="startWizard()">+ New project</button>
+      </div>
+      <div id="project-list" class="project-list"></div>
+      <div id="project-list-empty" class="project-list-empty hidden">
+        No projects yet under this projects folder - click "New project" to create one.
+      </div>
+    </div>
+  </main>
+
+  <main id="screen-wizard" class="stage hidden">
+    <div class="card wizard-card">
+      <div id="wizard-step-name" class="wizard-step">
+        <h1 class="overview-title">New project</h1>
+        <label class="wizard-label" for="wizard-name-input">Project name</label>
+        <input id="wizard-name-input" class="wizard-input" type="text" placeholder="e.g. hate symbols" />
+        <div class="wizard-actions">
+          <button class="btn btn-neutral" onclick="backToOverview()">Cancel</button>
+          <button class="btn btn-accent" onclick="wizardStep('good')">Next →</button>
+        </div>
+      </div>
+
+      <div id="wizard-step-good" class="wizard-step hidden">
+        <h1 class="overview-title">Good-images folder</h1>
+        <p class="wizard-hint">Pick the folder of images that do <strong>not</strong> show the flagged category.</p>
+        <button class="btn btn-neutral wizard-folder-btn" onclick="wizardPickFolder('good')">📁 Choose folder…</button>
+        <div id="wizard-good-path" class="wizard-path"></div>
+        <div class="wizard-actions">
+          <button class="btn btn-neutral" onclick="wizardStep('name')">← Back</button>
+          <button id="wizard-good-next" class="btn btn-accent" onclick="wizardStep('bad')" disabled>Next →</button>
+        </div>
+      </div>
+
+      <div id="wizard-step-bad" class="wizard-step hidden">
+        <h1 class="overview-title">Bad-images folder</h1>
+        <p class="wizard-hint">Pick the folder of images that <strong>do</strong> show the flagged category. The folder name becomes the detector's category.</p>
+        <button class="btn btn-neutral wizard-folder-btn" onclick="wizardPickFolder('bad')">📁 Choose folder…</button>
+        <div id="wizard-bad-path" class="wizard-path"></div>
+        <div class="wizard-actions">
+          <button class="btn btn-neutral" onclick="wizardStep('good')">← Back</button>
+          <button id="wizard-create-btn" class="btn btn-accent" onclick="wizardCreate()" disabled>Create &amp; train →</button>
+        </div>
+        <div id="wizard-error" class="wizard-error hidden"></div>
+      </div>
+
+      <div id="wizard-step-training" class="wizard-step hidden">
+        <h1 class="overview-title">Training…</h1>
+        <p class="wizard-hint">First-time training on the new project. This lands in the review queue once it finishes.</p>
+        <div id="wizard-training-slot"></div>
+      </div>
+    </div>
+  </main>
+
+  <main id="screen-review" class="stage">
     <div class="card">
       <div class="progress">
         <span id="progress-text">Loading…</span>
