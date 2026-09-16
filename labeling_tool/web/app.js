@@ -1,3 +1,4 @@
+const themeToggleEl = document.getElementById("theme-toggle");
 const imageEl = document.getElementById("skin-image");
 const skinViewsEl = document.getElementById("skin-views");
 const skinViewsHintEl = document.getElementById("skin-views-hint");
@@ -536,6 +537,30 @@ attachRotation(skinModelLayersEl);
 // each canvas needs - without this they'd stay at the old size and look soft.
 window.addEventListener("resize", drawSkinViews);
 
+// The theme actually in effect right now: the manual override if one is set via
+// data-theme, otherwise whatever the OS reports through prefers-color-scheme.
+function effectiveTheme() {
+  return document.documentElement.getAttribute("data-theme")
+    || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+}
+
+function applyTheme(theme) {
+  if (theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+  } else {
+    document.documentElement.removeAttribute("data-theme");
+  }
+  // Icon shows what clicking would switch *to*, not the current theme.
+  themeToggleEl.textContent = effectiveTheme() === "dark" ? "☀️" : "🌙";
+}
+
+function toggleTheme() {
+  const next = effectiveTheme() === "dark" ? "light" : "dark";
+  applyTheme(next);
+  window.pywebview.api.set_theme(next);
+}
+
 window.addEventListener("pywebviewready", () => {
+  window.pywebview.api.get_settings().then((settings) => applyTheme(settings.theme));
   window.pywebview.api.get_state().then(render);
 });

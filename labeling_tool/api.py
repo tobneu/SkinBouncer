@@ -5,10 +5,13 @@ JS UI and Python. Kept intentionally thin: all real logic lives in the session c
 
 import base64
 
+from .settings import DEFAULT_SETTINGS_PATH, load_theme, save_theme
+
 
 class LabelingAPI:
-    def __init__(self, session):
+    def __init__(self, session, settings_path=DEFAULT_SETTINGS_PATH):
         self._session = session
+        self._settings_path = settings_path
 
     def get_state(self):
         path = self._session.current_path()
@@ -36,6 +39,16 @@ class LabelingAPI:
         if not self._session.is_done():
             self._session.decide(action)
         return self.get_state()
+
+    def get_settings(self):
+        """Kept separate from get_state(): theme is a cross-cutting GUI setting, not
+        review-session state, the same reasoning that keeps get_training_progress()
+        off get_state() in ActiveLearningAPI."""
+        return {"theme": load_theme(self._settings_path)}
+
+    def set_theme(self, theme):
+        save_theme(theme, self._settings_path)
+        return {"status": "ok"}
 
 
 class ActiveLearningAPI(LabelingAPI):

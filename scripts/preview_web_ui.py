@@ -74,7 +74,7 @@ def _default_skin():
     return None
 
 
-def _build_page(screen, skin_path):
+def _build_page(screen, skin_path, saved_theme=None):
     """Copies the real web assets somewhere writable and drops a mock bridge in front of
     them, so index.html itself is rendered rather than a stand-in for it."""
     work = Path(tempfile.mkdtemp(prefix="skinbouncer-ui-"))
@@ -96,6 +96,8 @@ window.pywebview = {{api: {{
   decide: () => Promise.resolve(STATE),
   retrain: () => Promise.resolve({{status: "started"}}),
   get_training_progress: () => Promise.resolve({{status: "idle"}}),
+  get_settings: () => Promise.resolve({{theme: {json.dumps(saved_theme)}}}),
+  set_theme: (theme) => Promise.resolve({{status: "ok"}}),
   export_detector: () => Promise.resolve({{category: "demo", threshold: 0.5,
                                            dest_dir: "api/models/detectors/demo"}}),
 }}}};
@@ -117,6 +119,8 @@ def main():
     parser.add_argument("--screen", choices=SCREENS, default="active-learning",
                         help="Which js_api's state shape to render (default: active-learning)")
     parser.add_argument("--theme", choices=("dark", "light", "system"), default="system")
+    parser.add_argument("--saved-theme", choices=("light", "dark"), default=None,
+                        help="Simulate a manual theme override already saved (should win over --theme)")
     parser.add_argument("--skin", default=None, help="Skin PNG to show (default: one from sample_data)")
     parser.add_argument("--out", default=None, help="Write a screenshot here")
     parser.add_argument("--eval", dest="expression", default=None,
@@ -150,7 +154,7 @@ def main():
             f'extra: uv sync --all-extras, or pip install -e ".[labeling-tool]".'
         )
 
-    page_path = _build_page(args.screen, args.skin or _default_skin())
+    page_path = _build_page(args.screen, args.skin or _default_skin(), args.saved_theme)
 
     # QtWebEngine builds its own Chromium command line from argv and aborts outright if
     # it can't find a program name, so an empty list isn't an option here.
