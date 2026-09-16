@@ -1,7 +1,7 @@
 """CLI wrapper around skinbouncer_core.export_detector.
 
 Copies a trained project's checkpoint + tuned threshold into the folder
-06_Deployment/build.sh bakes into the API image, and reports how the detector scores
+api/build.sh bakes into the API image, and reports how the detector scores
 on its frozen test split so the export decision has numbers behind it.
 
 Usage:
@@ -89,7 +89,7 @@ def main():
 
     print(f"\nExported detector '{result['category']}' (threshold {result['threshold']:.4f}) to:")
     print(f"  {result['dest_dir']}")
-    print("\nShip it with:\n  06_Deployment/build.sh")
+    print("\nShip it with:\n  api/build.sh")
 
 
 if __name__ == "__main__":

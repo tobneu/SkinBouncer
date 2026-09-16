@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # Build the SkinBouncer deployment image, baking in whatever detector folders
-# currently exist under 06_Deployment/api/models/detectors/ - there's no runtime
+# currently exist under api/models/detectors/ - there's no runtime
 # toggle, a detector is "enabled" simply by having been present at build time.
 #
 # Usage:
-#   06_Deployment/build.sh [image-tag]
+#   api/build.sh [image-tag]
 #
 # Runnable from anywhere; paths resolve relative to this script, not the cwd.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-DETECTORS_DIR="$SCRIPT_DIR/api/models/detectors"
+DETECTORS_DIR="$SCRIPT_DIR/models/detectors"
 IMAGE_TAG="${1:-skinbouncer-api:latest}"
 
 # Guarantee the directory exists (it's gitignored - a fresh clone has none of it) so

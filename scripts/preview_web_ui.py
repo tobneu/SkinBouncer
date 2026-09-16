@@ -97,7 +97,7 @@ window.pywebview = {{api: {{
   retrain: () => Promise.resolve({{status: "started"}}),
   get_training_progress: () => Promise.resolve({{status: "idle"}}),
   export_detector: () => Promise.resolve({{category: "demo", threshold: 0.5,
-                                           dest_dir: "06_Deployment/api/models/detectors/demo"}}),
+                                           dest_dir: "api/models/detectors/demo"}}),
 }}}};
 window.addEventListener("load", () => window.dispatchEvent(new Event("pywebviewready")));
 </script>

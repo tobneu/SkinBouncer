@@ -1,6 +1,6 @@
 # SkinBouncer Paper plugin
 
-Checks every joining player's skin against a running [SkinBouncer API](../06_Deployment/)
+Checks every joining player's skin against a running [SkinBouncer API](../api/)
 and warns staff when a detector flags it.
 
 It is a **warning system**: nobody is kicked, and the joining player is never told. A flag
@@ -22,7 +22,7 @@ together on one network:
 
 ```bash
 EULA=TRUE MC_OPS=<your-minecraft-name> \
-    docker compose -f 06_Deployment/docker-compose.demo.yml up --build
+    docker compose -f api/docker-compose.demo.yml up --build
 ```
 
 To use an existing server instead, drop `target/SkinBouncer.jar` into its `plugins/`
@@ -41,7 +41,7 @@ Staff warnings go to holders of `skinbouncer.notify` (default: op).
 ## Requirements
 
 - **Paper 26.2** (Java 25). The server version in
-  [`../06_Deployment/docker-compose.demo.yml`](../06_Deployment/docker-compose.demo.yml)
+  [`../api/docker-compose.demo.yml`](../api/docker-compose.demo.yml)
   is pinned to match the API this is compiled against — bump both together, or not at all.
 - **The server must run in online mode.** The API identifies players through Mojang; an
   offline-mode server hands out UUIDs Mojang has never seen, so every lookup returns 404.

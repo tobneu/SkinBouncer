@@ -3,7 +3,7 @@
 #
 #   ./minecraft_plugin/build.sh
 #   EULA=TRUE MC_OPS=<your-minecraft-name> \
-#       docker compose -f 06_Deployment/docker-compose.demo.yml up --build
+#       docker compose -f api/docker-compose.demo.yml up --build
 #
 # ONLINE_MODE is on because the API identifies players through Mojang - an offline-mode
 # server hands out UUIDs Mojang has never seen, and every lookup would come back 404.
@@ -13,13 +13,13 @@ services:
   api:
     build:
       context: ..
-      dockerfile: 06_Deployment/Dockerfile
+      dockerfile: api/Dockerfile
     environment:
       # Mounted rather than baked in, so re-exporting a detector and restarting this
       # container is enough - no image rebuild between training rounds.
       SKINBOUNCER_DETECTORS_DIR: /detectors
     volumes:
-      - ./api/models/detectors:/detectors:ro
+      - ./models/detectors:/detectors:ro
     ports:
       - "8000:8000"
 

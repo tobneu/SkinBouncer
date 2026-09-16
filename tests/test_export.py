@@ -101,6 +101,6 @@ def test_export_raises_for_a_directory_that_is_not_a_project(tmp_path):
 def test_default_detectors_dir_is_the_folder_the_image_build_bakes_in():
     # Guards the export -> build.sh -> docker chain: build.sh reads exactly this path,
     # so a move of either side without the other silently breaks deployment.
-    assert DEFAULT_DETECTORS_DIR.parts[-4:] == ("06_Deployment", "api", "models", "detectors")
-    build_script = DEFAULT_DETECTORS_DIR.parents[3] / "06_Deployment" / "build.sh"
-    assert 'DETECTORS_DIR="$SCRIPT_DIR/api/models/detectors"' in build_script.read_text()
+    assert DEFAULT_DETECTORS_DIR.parts[-3:] == ("api", "models", "detectors")
+    build_script = DEFAULT_DETECTORS_DIR.parents[2] / "api" / "build.sh"
+    assert 'DETECTORS_DIR="$SCRIPT_DIR/models/detectors"' in build_script.read_text()

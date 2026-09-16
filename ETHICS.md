@@ -122,7 +122,7 @@ you collect your own data, that site's terms are between you and them.
 skin. Two things follow: Mojang learns which players your server is checking, and you are
 processing personal data if your jurisdiction counts a player identifier as such. The API
 holds each skin in a temporary directory only for the duration of the request and deletes
-it afterwards ([`06_Deployment/api/main.py`](06_Deployment/api/main.py)) — it deliberately
+it afterwards ([`api/main.py`](api/main.py)) — it deliberately
 keeps no history. If you add logging, you are the one deciding retention.
 
 ---

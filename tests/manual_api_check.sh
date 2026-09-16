@@ -2,7 +2,7 @@
 # Manual smoke test against a *running* deployment API container - not part of the
 # pytest suite (see test_deployment_api.py for the automated, offline version of
 # these same checks). Start the container first:
-#   06_Deployment/build.sh && docker run --rm -p 8000:8000 skinbouncer-api:latest
+#   api/build.sh && docker run --rm -p 8000:8000 skinbouncer-api:latest
 #
 # Usage:
 #   tests/manual_api_check.sh [base_url] [player_name...]
