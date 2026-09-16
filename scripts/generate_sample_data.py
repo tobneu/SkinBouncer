@@ -25,7 +25,7 @@ Provenance:
   (api.mojang.com, sessionserver.mojang.com) by resolving randomly generated candidate
   usernames until enough resolve to a real, skinned account - the same technique the
   project's original Kaggle source dataset was built with (see
-  02_DataUnderstanding/DataUnderstanding.ipynb). No scraping, no third-party site, no
+  DataUnderstanding/DataUnderstanding.ipynb). No scraping, no third-party site, no
   ToS concern - this is the same public API the kept SkinsFromUuid downloader uses.
 - bad_demo/: a disjoint set of real skins (same source, no overlap with good/) with a
   synthetic, self-drawn colorful smiley stamped onto the front-torso ("belly") region as
@@ -51,7 +51,7 @@ from pathlib import Path
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "02_DataUnderstanding" / "Mining" / "SkinsFromUuid"))
+sys.path.insert(0, str(ROOT / "DataUnderstanding" / "Mining" / "SkinsFromUuid"))
 from minecraft_skin_downloader import MinecraftSkinDownloader  # noqa: E402
 
 OUTPUT_ROOT = ROOT / "sample_data"
@@ -63,7 +63,7 @@ ATTEMPTS_PER_IMAGE = 10  # ~77% hit rate observed, generous margin
 REQUEST_DELAY_SECONDS = 0.15  # be polite to the Mojang API
 
 # UV boxes the marker is stamped into, as (x, y, w, h) - head and torso, front and back.
-# Coordinates match HEAD/BODY in 02_DataUnderstanding/skin.py:58-73, the only place in
+# Coordinates match HEAD/BODY in DataUnderstanding/skin.py:58-73, the only place in
 # the repo defining this mapping.
 #
 # Four regions rather than one, because a real prohibited skin differs over the whole

@@ -2,7 +2,7 @@
 the shared CNN architecture on the train partition, validate on val, and save a
 checkpoint (+ threshold + metrics) into the project directory.
 
-Ported from `04_Modeling/Modeling.ipynb`'s training pipeline, with two deliberate
+Ported from `Modeling/Modeling.ipynb`'s training pipeline, with two deliberate
 deviations from a direct copy:
 
 - The train dataset is explicitly shuffled before batching. `_stratified_assign` in

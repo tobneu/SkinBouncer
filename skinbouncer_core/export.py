@@ -1,9 +1,9 @@
 """Publishes a trained detector project into the folder the deployment image is built
 from, so a finished detector reaches the API without any manual file copying.
 
-The exported layout is exactly what 06_Deployment/api/main.py's load_detectors() scans
+The exported layout is exactly what api/main.py's load_detectors() scans
 for - one subfolder per category containing model.keras + threshold.json - and is the
-same folder 06_Deployment/build.sh bakes into the image. A detector is "deployed"
+same folder api/build.sh bakes into the image. A detector is "deployed"
 simply by having been exported before the next build; there is no separate registry.
 """
 
@@ -15,7 +15,7 @@ from .detector_project import load_manifest
 
 # Resolved from this file rather than the cwd, so exporting works the same from a
 # script, a test, or the labeling tool's GUI regardless of where it was launched.
-DEFAULT_DETECTORS_DIR = Path(__file__).resolve().parent.parent / "06_Deployment" / "api" / "models" / "detectors"
+DEFAULT_DETECTORS_DIR = Path(__file__).resolve().parent.parent / "api" / "models" / "detectors"
 
 
 def export_detector(project_dir, detectors_dir=None):

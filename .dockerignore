@@ -1,5 +1,5 @@
 # Allowlist: ignore everything by default, then explicitly include only what the
-# deployment image (06_Deployment/Dockerfile) needs. The rest of this repo (notebooks,
+# deployment image (api/Dockerfile) needs. The rest of this repo (notebooks,
 # data/, sample_data/, detector_projects/, tests/) is sizeable and irrelevant to the
 # built image, so it's kept out of the build context entirely rather than copied in
 # and unused.
@@ -13,8 +13,8 @@
 !labeling_tool
 !labeling_tool/**
 
-!06_Deployment
-!06_Deployment/**
+!api
+!api/**
 
 # Still exclude caches even under the allowed dirs above.
 **/__pycache__

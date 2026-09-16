@@ -22,7 +22,7 @@ def _rate(numerator, denominator):
 def evaluate_confusion_matrix(manifest, model, threshold):
     """Scores every image in the frozen test split and tallies a 2x2 confusion
     matrix. good=0/bad=1 matches _load_split_arrays' convention; `score > threshold`
-    matches 06_Deployment/api/main.py's risk convention, so this reports the same
+    matches api/main.py's risk convention, so this reports the same
     accept/reject decision the deployed detector would make.
 
     Returns None if the project's test split is empty, else a dict of plain-int counts

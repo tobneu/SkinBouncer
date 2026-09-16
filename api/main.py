@@ -11,8 +11,8 @@ from minecraft_skin_downloader import MinecraftSkinDownloader
 from skinbouncer_core import load_model, load_skin
 
 # Resolved relative to this file rather than the process cwd, so `uvicorn main:app`
-# behaves the same from the repo root, from 06_Deployment/api/, and inside the image -
-# main.py sits next to models/detectors/ in all three (see 06_Deployment/Dockerfile).
+# behaves the same from the repo root, from api/, and inside the image -
+# main.py sits next to models/detectors/ in all three (see api/Dockerfile).
 # The env var lets a deployment point at a detectors folder mounted elsewhere.
 DETECTORS_DIR = Path(
     os.environ.get("SKINBOUNCER_DETECTORS_DIR")
