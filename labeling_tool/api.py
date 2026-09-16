@@ -153,10 +153,19 @@ class SkinBouncerAPI:
     def _maybe_finish_training(self):
         """Cold-start training (wizard or auto-train-on-open) has no session to attach
         to until it succeeds - this is where that session finally gets constructed,
-        the moment a caller next asks for state or progress after training finished."""
+        the moment a caller next asks for state or progress after training finished.
+
+        trained_project_dir is cleared unconditionally, before _open() runs: a project
+        that trains fine but fails to open (e.g. a stale manifest pointing at images
+        that no longer exist) must not be retried on every subsequent poll forever -
+        it failed once, it's reported once, same as any other error here."""
         if self._project_api is None and self._overview.trained_project_dir is not None:
-            self._open(self._overview.trained_project_dir)
+            project_dir = self._overview.trained_project_dir
             self._overview.trained_project_dir = None
+            try:
+                self._open(project_dir)
+            except Exception as e:
+                self._overview.training_progress = {"status": "error", "error": str(e)}
 
     def get_state(self):
         self._maybe_finish_training()
@@ -192,7 +201,10 @@ class SkinBouncerAPI:
     def open_project(self, project_dir):
         project_dir = Path(project_dir)
         if (project_dir / "model.keras").exists() and (project_dir / "threshold.json").exists():
-            self._open(project_dir)
+            try:
+                self._open(project_dir)
+            except Exception as e:
+                return {"status": "error", "message": str(e)}
             return {"status": "ok"}
         try:
             self._overview.train_existing(project_dir)

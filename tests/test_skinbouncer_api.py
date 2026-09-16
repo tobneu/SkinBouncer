@@ -120,6 +120,25 @@ def test_open_project_on_trained_project_goes_straight_to_review(tmp_path, monke
     assert api.get_state()["screen"] == "review"
 
 
+def test_open_project_on_trained_project_that_fails_to_open_returns_error(tmp_path, monkeypatch):
+    # e.g. a stale manifest pointing at sample images that no longer exist -
+    # ActiveLearningSession itself raises, and that must surface as a normal error
+    # response, not an uncaught exception crossing the js_api bridge.
+    project_dir = _make_project_dir(tmp_path, "bad_demo", trained=True)
+
+    def _boom(project_dir):
+        raise FileNotFoundError("sample_data/good/archer02.png")
+
+    monkeypatch.setattr("labeling_tool.api.ActiveLearningSession", _boom)
+    api = _make_api(tmp_path)
+
+    result = api.open_project(str(project_dir))
+
+    assert result == {"status": "error", "message": "sample_data/good/archer02.png"}
+    assert api._project_api is None
+    assert api.get_state()["screen"] == "overview"
+
+
 def test_open_project_on_untrained_project_starts_training(tmp_path):
     project_dir = _make_project_dir(tmp_path, "bad_demo", trained=False)
     api = _make_api(tmp_path)
@@ -158,6 +177,32 @@ def test_get_training_progress_auto_opens_the_project_once_done(tmp_path, monkey
     assert api.get_state()["screen"] == "review"
     # consumed - a later close_project()/reopen cycle can't accidentally re-trigger it
     assert api._overview.trained_project_dir is None
+
+
+def test_maybe_finish_training_reports_error_and_does_not_retry_forever(tmp_path, monkeypatch):
+    # Training itself succeeded, but opening the freshly-trained project fails (same
+    # class of bug as the open_project() case above). Must surface once as an error,
+    # not raise on every subsequent poll - a bare guard on trained_project_dir alone
+    # would keep retrying (and crashing) forever since nothing else ever clears it.
+    project_dir = _make_project_dir(tmp_path, "bad_demo", trained=False)
+
+    def _boom(project_dir):
+        raise FileNotFoundError("sample_data/good/archer02.png")
+
+    monkeypatch.setattr("labeling_tool.api.ActiveLearningSession", _boom)
+    api = _make_api(tmp_path)
+    api._overview.training_progress = {"status": "done"}
+    api._overview.trained_project_dir = project_dir
+
+    progress = api.get_training_progress()
+
+    assert progress == {"status": "error", "error": "sample_data/good/archer02.png"}
+    assert api._overview.trained_project_dir is None
+    assert api._project_api is None
+
+    # a second poll must not try to reopen it again
+    second = api.get_training_progress()
+    assert second == progress
 
 
 def test_decide_retrain_export_delegate_to_the_open_project(tmp_path, monkeypatch):
