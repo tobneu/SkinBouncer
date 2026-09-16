@@ -18,7 +18,7 @@ recorded label:
     suspicion = 1 - prob    if recorded_class == "bad"     (lower prob = more suspect)
 
 Sorting all train+val images descending by this score generalizes
-04_Modeling/Modeling.ipynb cell 47's false-negative/false-positive-by-confidence
+Modeling/Modeling.ipynb cell 47's false-negative/false-positive-by-confidence
 approach to also cover near-threshold cases that reference cell doesn't handle. A
 human-readable `reason` is derived from the same inputs for display, independent of
 the sort key, so both the "combined score" and "separate reasons" readings of the

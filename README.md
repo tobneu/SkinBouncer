@@ -101,12 +101,12 @@ hardcoded. See [`skinbouncer_core/train.py`](skinbouncer_core/train.py).
 
 ```bash
 python scripts/export_detector.py --project-dir detector_projects/bad_demo
-06_Deployment/build.sh
+api/build.sh
 docker run --rm -p 8000:8000 skinbouncer-api:latest
 ```
 
 Export prints the test-split confusion matrix, then copies the checkpoint and threshold
-into `06_Deployment/api/models/detectors/<category>/`, which is what the image bakes in.
+into `api/models/detectors/<category>/`, which is what the image bakes in.
 
 ```bash
 curl localhost:8000/
@@ -125,7 +125,7 @@ startup rather than silently scoring nothing.
 ```bash
 ./minecraft_plugin/build.sh                     # containerized, no local JDK needed
 EULA=TRUE MC_OPS=<your-minecraft-name> \
-    docker compose -f 06_Deployment/docker-compose.demo.yml up --build
+    docker compose -f api/docker-compose.demo.yml up --build
 ```
 
 Starts the API and a Paper server together. On join, the plugin scores the player off the
@@ -140,7 +140,7 @@ Mojang. See [`minecraft_plugin/`](minecraft_plugin/).
 Detectors are independent folders, and the API loads every one it finds:
 
 ```
-06_Deployment/api/models/detectors/
+api/models/detectors/
 ├── bad_demo/       model.keras + threshold.json
 └── hate_symbols/   model.keras + threshold.json
 ```
@@ -229,12 +229,12 @@ the repository still carries that structure — one directory per phase, noteboo
 
 | Folder | Phase |
 |---|---|
-| [`01_BusinessUnderstanding/`](01_BusinessUnderstanding/) | Motivation, scope, success criteria |
-| [`02_DataUnderstanding/`](02_DataUnderstanding/) | Data sources, scrapers, EDA |
-| [`03_DataPreparation/`](03_DataPreparation/) | Loading, normalization, splits, augmentation |
-| [`04_Modeling/`](04_Modeling/) | CNN architecture, baseline, training |
-| [`05_Evaluation/`](05_Evaluation/) | Metrics, threshold tuning, baseline vs. CNN |
-| [`06_Deployment/`](06_Deployment/) | FastAPI service, Mojang lookup, Docker |
+| [`BusinessUnderstanding/`](BusinessUnderstanding/) | Motivation, scope, success criteria |
+| [`DataUnderstanding/`](DataUnderstanding/) | Data sources, scrapers, EDA |
+| [`DataPreparation/`](DataPreparation/) | Loading, normalization, splits, augmentation |
+| [`Modeling/`](Modeling/) | CNN architecture, baseline, training |
+| [`Evaluation/`](Evaluation/) | Metrics, threshold tuning, baseline vs. CNN |
+| [`api/`](api/) | FastAPI service, Mojang lookup, Docker |
 
 The demo class was **Spider-Man skins** — an arbitrary stand-in. The categories that
 actually motivate this are things like hate imagery, and a university project has no
@@ -253,7 +253,7 @@ dataset — not reproducible from this repo, which ships no data:
 
 At the same recall target, the CNN more than doubles precision, cutting false-positive
 moderation work by ~76 %. Full curves and the deployment recommendation are in
-[`05_Evaluation/Evaluation.ipynb`](05_Evaluation/Evaluation.ipynb). All randomness is
+[`Evaluation/Evaluation.ipynb`](Evaluation/Evaluation.ipynb). All randomness is
 seeded (`SEED = 67`).
 
 > **The notebooks are a record, not a runnable path.** They load from a dataset that is
@@ -261,7 +261,7 @@ seeded (`SEED = 67`).
 
 ### Fetching skins yourself
 
-[`02_DataUnderstanding/Mining/SkinsFromUuid/minecraft_skin_downloader.py`](02_DataUnderstanding/Mining/SkinsFromUuid/minecraft_skin_downloader.py)
+[`DataUnderstanding/Mining/SkinsFromUuid/minecraft_skin_downloader.py`](DataUnderstanding/Mining/SkinsFromUuid/minecraft_skin_downloader.py)
 builds a resumable CSV manifest of `(uuid, skin_url, image_path, label)` and downloads
 idempotently. Fine for looking up individual players; not practical for bulk collection,
 because Mojang rate-limits hard. The keyword scraper used for the original Spider-Man set
@@ -339,7 +339,7 @@ Layout: `skinbouncer_core/` is importable library code, `labeling_tool/` is the 
 - **Minecraft Skin Wiki** for the UV-mapping reference: https://minecraft.wiki/w/Skin
 - **CNN architecture** adapted from *CNN for MNIST Classification* by Abbas Rahem Abdulhamza,
   published on Kaggle. A copy is kept at
-  [`04_Modeling/cnn-for-mnist-classification.ipynb`](04_Modeling/cnn-for-mnist-classification.ipynb)
+  [`Modeling/cnn-for-mnist-classification.ipynb`](Modeling/cnn-for-mnist-classification.ipynb)
   for reference; it is the original author's work, not ours, and no license was stated on it.
 
 This project was developed for an FH machine-learning course; per the course rules, any

@@ -18,11 +18,11 @@ COPY skinbouncer_core ./skinbouncer_core
 COPY labeling_tool ./labeling_tool
 RUN pip install --no-cache-dir .
 
-COPY 06_Deployment/api/main.py 06_Deployment/api/minecraft_skin_downloader.py ./
+COPY api/main.py api/minecraft_skin_downloader.py ./
 # Whatever detector folders exist here at build time (and only those) end up in the
 # image - there's no runtime toggle. build.sh creates this directory if it doesn't
 # exist yet, so a fresh clone with zero exported detectors still builds cleanly.
-COPY 06_Deployment/api/models/detectors ./models/detectors
+COPY api/models/detectors ./models/detectors
 
 EXPOSE 8000
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

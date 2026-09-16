@@ -99,7 +99,7 @@ window.pywebview = {{api: {{
   get_settings: () => Promise.resolve({{theme: {json.dumps(saved_theme)}}}),
   set_theme: (theme) => Promise.resolve({{status: "ok"}}),
   export_detector: () => Promise.resolve({{category: "demo", threshold: 0.5,
-                                           dest_dir: "06_Deployment/api/models/detectors/demo"}}),
+                                           dest_dir: "api/models/detectors/demo"}}),
 }}}};
 window.addEventListener("load", () => window.dispatchEvent(new Event("pywebviewready")));
 </script>

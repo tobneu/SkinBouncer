@@ -1,10 +1,10 @@
-"""Exercises the FastAPI app in 06_Deployment/api/main.py the same way it's run in
-the deployment image: main.py imported with 06_Deployment/api on sys.path (so its
+"""Exercises the FastAPI app in api/main.py the same way it's run in
+the deployment image: main.py imported with api on sys.path (so its
 bare `import minecraft_skin_downloader` resolves), and its module-level `detectors`
 dict built at import time from the folder SKINBOUNCER_DETECTORS_DIR points at.
 
 Setting that env var is what keeps these tests off the repo's own
-06_Deployment/api/models/detectors - main.py otherwise resolves the folder relative
+api/models/detectors - main.py otherwise resolves the folder relative
 to its own location, which in a source checkout is the maintainer's real exports.
 Network calls to Mojang are stubbed out so these run offline.
 """
@@ -21,7 +21,7 @@ from PIL import Image
 from skinbouncer_core import export_detector, setup_detector_project
 from skinbouncer_core.train import train_detector
 
-API_DIR = Path(__file__).resolve().parents[1] / "06_Deployment" / "api"
+API_DIR = Path(__file__).resolve().parents[1] / "api"
 if str(API_DIR) not in sys.path:
     sys.path.insert(0, str(API_DIR))
 

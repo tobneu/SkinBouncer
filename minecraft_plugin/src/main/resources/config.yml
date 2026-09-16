@@ -1,5 +1,5 @@
 # Where the SkinBouncer API is reachable from the server process. When both run under
-# 06_Deployment/docker-compose.demo.yml they share a network and the API is just "api".
+# api/docker-compose.demo.yml they share a network and the API is just "api".
 api-url: http://api:8000/check/player/
 
 # Covers the whole request. The API resolves the player through Mojang and downloads the
