@@ -32,3 +32,14 @@ def test_get_state_done_has_no_image_data(tmp_path):
         "filename": None,
         "image_data_uri": None,
     }
+
+
+def test_get_settings_with_no_saved_theme_is_none(tmp_path):
+    api = LabelingAPI(ReviewSession(tmp_path), settings_path=tmp_path / "settings.json")
+    assert api.get_settings() == {"theme": None}
+
+
+def test_set_theme_persists_for_later_get_settings_calls(tmp_path):
+    api = LabelingAPI(ReviewSession(tmp_path), settings_path=tmp_path / "settings.json")
+    api.set_theme("dark")
+    assert api.get_settings() == {"theme": "dark"}

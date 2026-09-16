@@ -35,6 +35,39 @@
   }
 }
 
+/* Manual override via the theme toggle, stored in labeling_tool/settings.py and applied
+   as a data-theme attribute on <html>. An attribute selector on :root is more specific
+   than a bare :root inside a media query, so either block below always beats the
+   prefers-color-scheme block above regardless of source order; no data-theme attribute
+   set falls through to that OS-level default unchanged. */
+:root[data-theme="light"] {
+  --bg: #f2f3f5;
+  --panel: #ffffff;
+  --panel-border: #e4e6eb;
+  --text: #16181d;
+  --muted: #6b7280;
+  --frame-bg: #eceef1;
+  --neutral-btn: #eceef1;
+  --neutral-btn-hover: #e2e4e9;
+  --good-tint: rgba(34, 197, 94, 0.14);
+  --bad-tint: rgba(239, 68, 68, 0.14);
+  --bar-idle: #d3d7de;
+}
+
+:root[data-theme="dark"] {
+  --bg: #16181d;
+  --panel: #1e2128;
+  --panel-border: #2b2f38;
+  --text: #f5f6f8;
+  --muted: #9099a8;
+  --frame-bg: #14161b;
+  --neutral-btn: #2b2f38;
+  --neutral-btn-hover: #363b46;
+  --good-tint: rgba(34, 197, 94, 0.22);
+  --bad-tint: rgba(239, 68, 68, 0.22);
+  --bar-idle: #495060;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -70,6 +103,24 @@ body {
 .subtitle {
   color: var(--muted);
   font-size: 14px;
+}
+
+.theme-toggle {
+  margin-left: auto;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--neutral-btn);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  background: var(--neutral-btn-hover);
 }
 
 .stage {
