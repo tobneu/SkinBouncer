@@ -1,9 +1,10 @@
 from labeling_tool.active_learning_session import ActiveLearningSession
-from labeling_tool.api import ActiveLearningAPI, BlindTestReviewAPI, LabelingAPI
+from labeling_tool.api import ActiveLearningAPI, BlindTestReviewAPI, LabelingAPI, SkinBouncerAPI
 from labeling_tool.blind_test_review_session import BlindTestReviewSession
+from labeling_tool.overview_session import ProjectOverviewSession
 from labeling_tool.review_session import ReviewSession
 
-# The three window entrypoints live behind a lazy attribute because importing them pulls
+# The four window entrypoints live behind a lazy attribute because importing them pull
 # in pywebview, which only the `labeling-tool` extra installs. Everything above is plain
 # logic with no GUI dependency, and importing the package must not require a GUI toolkit
 # to reach it - that's what lets the tests exercise the js_api adapters without a window,
@@ -12,6 +13,7 @@ _LAZY_ENTRYPOINTS = {
     "main": "labeling_tool.app",
     "run_active_learning_queue": "labeling_tool.active_learning_app",
     "run_blind_test_review": "labeling_tool.blind_test_review_app",
+    "run_skinbouncer": "labeling_tool.skinbouncer_app",
 }
 
 
@@ -38,4 +40,7 @@ __all__ = [
     "BlindTestReviewSession",
     "BlindTestReviewAPI",
     "run_blind_test_review",
+    "ProjectOverviewSession",
+    "SkinBouncerAPI",
+    "run_skinbouncer",
 ]

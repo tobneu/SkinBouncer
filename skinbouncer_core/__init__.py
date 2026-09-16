@@ -9,6 +9,7 @@ from .detector_project import (
     save_manifest,
     get_split_filepaths,
     relabel_image,
+    project_display_name,
 )
 from .train import train_detector
 from .run_history import append_run_history, compare_runs
@@ -32,6 +33,7 @@ __all__ = [
     "save_manifest",
     "get_split_filepaths",
     "relabel_image",
+    "project_display_name",
     "train_detector",
     "append_run_history",
     "compare_runs",

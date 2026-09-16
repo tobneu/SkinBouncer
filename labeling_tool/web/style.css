@@ -624,3 +624,220 @@ body {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent) inset;
 }
+
+/* --------------------------------------------------------------------------
+   Project overview + new-project wizard (scripts/run_skinbouncer.py)
+   -------------------------------------------------------------------------- */
+
+.back-link {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 6px 4px;
+}
+
+.back-link:hover {
+  color: var(--text);
+}
+
+/* Theme toggle no longer the rightmost element once the back-link can also show up -
+   it should sit last regardless of which of the two is present. */
+#theme-toggle {
+  margin-left: 12px;
+}
+
+.overview-card,
+.wizard-card {
+  width: 480px;
+  text-align: left;
+}
+
+.overview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.overview-title {
+  font-size: 19px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.btn-new-project {
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  background: var(--accent);
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+.btn-new-project:hover {
+  filter: brightness(1.06);
+}
+
+.project-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.project-list-empty {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 12px 2px;
+}
+
+.project-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  background: var(--frame-bg);
+}
+
+.project-card:hover {
+  background: var(--neutral-btn-hover);
+}
+
+.project-card-name {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.project-card-status {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--good-tint);
+  color: var(--good);
+  white-space: nowrap;
+}
+
+.project-card-status.untrained {
+  background: var(--neutral-btn);
+  color: var(--muted);
+}
+
+.wizard-step h1 {
+  margin-top: 0;
+}
+
+.wizard-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 6px;
+}
+
+.wizard-input {
+  width: 100%;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  background: var(--frame-bg);
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.wizard-hint {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 0;
+}
+
+.wizard-folder-btn {
+  width: 100%;
+  border: 1px dashed var(--panel-border);
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--frame-bg);
+  color: var(--text);
+}
+
+.wizard-folder-btn:hover {
+  background: var(--neutral-btn-hover);
+}
+
+.wizard-path {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 8px;
+  word-break: break-all;
+  min-height: 14px;
+}
+
+.wizard-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.btn-neutral,
+.btn-accent {
+  flex: 1;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-neutral {
+  background: var(--neutral-btn);
+  color: var(--text);
+}
+
+.btn-neutral:hover {
+  background: var(--neutral-btn-hover);
+}
+
+.btn-accent {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.btn-accent:hover {
+  filter: brightness(1.06);
+}
+
+.btn-accent:disabled,
+.btn-neutral:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.wizard-error {
+  margin-top: 14px;
+  font-size: 12px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: var(--bad-tint);
+  word-break: break-word;
+}
+
+#wizard-step-training .training-progress {
+  margin-top: 16px;
+}

@@ -17,6 +17,10 @@ const btnBadEl = document.getElementById("btn-bad");
 const btnSkipEl = document.getElementById("btn-skip");
 const btnRetrainEl = document.getElementById("btn-retrain");
 const trainingProgressEl = document.getElementById("training-progress");
+// Captured before any reparenting happens (see beginColdStartTraining), so
+// showScreen() can always move trainingProgressEl back home when returning to
+// "review" - otherwise a later Retrain would render into a now-hidden subtree.
+const trainingProgressHomeEl = trainingProgressEl.parentElement;
 const trainingEpochLabelEl = document.getElementById("training-epoch-label");
 const trainingChartEl = document.getElementById("training-chart");
 const runComparisonEl = document.getElementById("run-comparison");
@@ -30,6 +34,24 @@ const testRatesEl = document.getElementById("test-rates");
 const curationNoteEl = document.getElementById("curation-note");
 const btnExportEl = document.getElementById("btn-export");
 const exportResultEl = document.getElementById("export-result");
+
+const backToOverviewEl = document.getElementById("back-to-overview");
+const screenOverviewEl = document.getElementById("screen-overview");
+const screenWizardEl = document.getElementById("screen-wizard");
+const screenReviewEl = document.getElementById("screen-review");
+const projectListEl = document.getElementById("project-list");
+const projectListEmptyEl = document.getElementById("project-list-empty");
+const wizardStepNameEl = document.getElementById("wizard-step-name");
+const wizardStepGoodEl = document.getElementById("wizard-step-good");
+const wizardStepBadEl = document.getElementById("wizard-step-bad");
+const wizardStepTrainingEl = document.getElementById("wizard-step-training");
+const wizardNameInputEl = document.getElementById("wizard-name-input");
+const wizardGoodPathEl = document.getElementById("wizard-good-path");
+const wizardBadPathEl = document.getElementById("wizard-bad-path");
+const wizardGoodNextEl = document.getElementById("wizard-good-next");
+const wizardCreateBtnEl = document.getElementById("wizard-create-btn");
+const wizardErrorEl = document.getElementById("wizard-error");
+const wizardTrainingSlotEl = document.getElementById("wizard-training-slot");
 
 let currentState = null;
 let busy = false;
@@ -156,7 +178,35 @@ function setControlsDisabled(disabled) {
   });
 }
 
+// Screens that don't come from a get_state() response (overview, wizard) are pure
+// client-side navigation - see startWizard()/showScreen() below. "review" is the
+// fallback so the three plain entrypoints (LabelingAPI/ActiveLearningAPI/
+// BlindTestReviewAPI), whose state never carries a "screen" key at all, keep working
+// exactly as before this was added.
 function render(state) {
+  const screen = state.screen || "review";
+  showScreen(screen);
+  if (screen === "overview") {
+    renderOverview(state.projects);
+  } else {
+    renderReview(state);
+  }
+}
+
+function showScreen(name) {
+  if (name === "review" && trainingProgressEl.parentElement !== trainingProgressHomeEl) {
+    trainingProgressHomeEl.appendChild(trainingProgressEl);
+    // Landing on review fresh (cold-start just finished) shouldn't show a stale
+    // training panel - only an in-progress Retrain should ever reveal it again.
+    trainingProgressEl.classList.add("hidden");
+  }
+  screenOverviewEl.classList.toggle("hidden", name !== "overview");
+  screenWizardEl.classList.toggle("hidden", name !== "wizard");
+  screenReviewEl.classList.toggle("hidden", name !== "review");
+  backToOverviewEl.classList.toggle("hidden", name === "overview");
+}
+
+function renderReview(state) {
   currentState = state;
   progressTextEl.textContent = state.done
     ? `Done — reviewed ${state.total} / ${state.total}`
@@ -445,28 +495,37 @@ function retrain() {
   // mid-replacement - render(state) brings it back once the new one is scored.
   confusionMatrixEl.classList.add("hidden");
   trainingProgressEl.classList.remove("hidden");
+  backToOverviewEl.classList.add("hidden");
   window.pywebview.api
     .retrain()
-    .then(pollTrainingProgress)
+    .then(() => pollTrainingProgress((progress) => {
+      if (progress.status === "error") {
+        onRetrainSettled();
+        alert(`Retrain failed:\n\n${progress.error}`);
+      } else {
+        window.pywebview.api.get_state().then((state) => {
+          onRetrainSettled();
+          render(state);
+        });
+      }
+    }))
     .catch((error) => {
       onRetrainSettled();
       alert(`Retrain failed:\n\n${error}`);
     });
 }
 
-function pollTrainingProgress() {
+// Shared by the review screen's Retrain button and the overview/wizard's cold-start
+// training (see beginColdStartTraining below) - both just need the epoch/AUC chart
+// kept live until training leaves the "running" state, then a caller-specific
+// reaction to how it settled.
+function pollTrainingProgress(onSettled) {
   window.pywebview.api.get_training_progress().then((progress) => {
     renderTrainingProgress(progress);
     if (progress.status === "running") {
-      setTimeout(pollTrainingProgress, 750);
-    } else if (progress.status === "error") {
-      onRetrainSettled();
-      alert(`Retrain failed:\n\n${progress.error}`);
+      setTimeout(() => pollTrainingProgress(onSettled), 750);
     } else {
-      window.pywebview.api.get_state().then((state) => {
-        onRetrainSettled();
-        render(state);
-      });
+      onSettled(progress);
     }
   });
 }
@@ -476,6 +535,7 @@ function onRetrainSettled() {
   setControlsDisabled(false);
   btnRetrainEl.textContent = "🔄 Retrain";
   trainingProgressEl.classList.add("hidden");
+  backToOverviewEl.classList.remove("hidden");
 }
 
 function exportDetector() {
@@ -536,6 +596,147 @@ attachRotation(skinModelLayersEl);
 // The panels are flexible, so a resized window changes how many backing-store pixels
 // each canvas needs - without this they'd stay at the old size and look soft.
 window.addEventListener("resize", drawSkinViews);
+
+// --------------------------------------------------------------------------
+// Project overview + new-project wizard (scripts/run_skinbouncer.py only - the three
+// plain entrypoints never navigate here, see render()'s "screen" fallback above).
+// --------------------------------------------------------------------------
+
+function renderOverview(projects) {
+  projectListEl.innerHTML = "";
+  projectListEmptyEl.classList.toggle("hidden", projects.length > 0);
+  for (const project of projects) {
+    const card = document.createElement("div");
+    card.className = "project-card";
+    card.onclick = () => openProject(project.project_dir);
+
+    const name = document.createElement("span");
+    name.className = "project-card-name";
+    name.textContent = project.display_name;
+
+    const status = document.createElement("span");
+    status.className = "project-card-status" + (project.trained ? "" : " untrained");
+    status.textContent = project.trained ? "Ready" : "Needs training";
+
+    card.append(name, status);
+    projectListEl.appendChild(card);
+  }
+}
+
+let wizardState = { name: "", goodDir: null, badDir: null };
+
+function wizardShowStep(step) {
+  wizardStepNameEl.classList.toggle("hidden", step !== "name");
+  wizardStepGoodEl.classList.toggle("hidden", step !== "good");
+  wizardStepBadEl.classList.toggle("hidden", step !== "bad");
+  wizardStepTrainingEl.classList.toggle("hidden", step !== "training");
+}
+
+function startWizard() {
+  wizardState = { name: "", goodDir: null, badDir: null };
+  wizardNameInputEl.value = "";
+  wizardGoodPathEl.textContent = "";
+  wizardBadPathEl.textContent = "";
+  wizardGoodNextEl.disabled = true;
+  wizardCreateBtnEl.disabled = true;
+  wizardErrorEl.classList.add("hidden");
+  wizardShowStep("name");
+  showScreen("wizard");
+}
+
+function wizardStep(step) {
+  if (step === "good" && !wizardNameInputEl.value.trim()) {
+    alert("Give the project a name first.");
+    return;
+  }
+  wizardState.name = wizardNameInputEl.value.trim();
+  wizardShowStep(step);
+}
+
+function wizardPickFolder(which) {
+  window.pywebview.api.pick_folder().then((result) => {
+    if (!result.path) {
+      return;
+    }
+    if (which === "good") {
+      wizardState.goodDir = result.path;
+      wizardGoodPathEl.textContent = result.path;
+      wizardGoodNextEl.disabled = false;
+    } else {
+      wizardState.badDir = result.path;
+      wizardBadPathEl.textContent = result.path;
+      wizardCreateBtnEl.disabled = false;
+    }
+  });
+}
+
+// Shared by wizardCreate() and openProject()'s auto-train-on-open path: both just
+// started cold-start training server-side and need the same "show the training step,
+// reuse the review screen's live chart, wait for it to settle" sequence - only what
+// happens on error differs (see the two call sites' onError callbacks).
+function beginColdStartTraining(onError) {
+  showScreen("wizard");
+  wizardShowStep("training");
+  backToOverviewEl.classList.add("hidden");
+  // Reparented rather than duplicated: only one of {wizard, review} is ever visible
+  // at a time, so the review screen's own training-progress chart/canvas can just be
+  // moved here for the duration instead of building (and keeping in sync) a second copy.
+  wizardTrainingSlotEl.appendChild(trainingProgressEl);
+  trainingProgressEl.classList.remove("hidden");
+  pollTrainingProgress((progress) => {
+    if (progress.status === "error") {
+      onError(progress.error);
+    } else {
+      // The backend has already opened the freshly-trained project by this point
+      // (SkinBouncerAPI._maybe_finish_training), so this naturally lands on "review".
+      window.pywebview.api.get_state().then(render);
+    }
+  });
+}
+
+function wizardCreate() {
+  wizardErrorEl.classList.add("hidden");
+  window.pywebview.api
+    .create_project(wizardState.name, wizardState.goodDir, wizardState.badDir)
+    .then((result) => {
+      if (result.status === "error") {
+        wizardErrorEl.textContent = result.message;
+        wizardErrorEl.classList.remove("hidden");
+        return;
+      }
+      beginColdStartTraining((message) => {
+        // Back to the step with the Create button (not the overview) - name/good/bad
+        // are all still filled in, so retrying costs nothing.
+        backToOverviewEl.classList.remove("hidden");
+        wizardShowStep("bad");
+        wizardErrorEl.textContent = `Training failed:\n\n${message}`;
+        wizardErrorEl.classList.remove("hidden");
+      });
+    });
+}
+
+function openProject(projectDir) {
+  window.pywebview.api.open_project(projectDir).then((result) => {
+    if (result.status === "error") {
+      alert(`Couldn't open project:\n\n${result.message}`);
+      return;
+    }
+    if (result.status === "started") {
+      // Existing project with no checkpoint yet - same cold-start screen as the
+      // wizard, just entered from the overview instead of from wizardCreate().
+      beginColdStartTraining((message) => {
+        alert(`Training failed:\n\n${message}`);
+        backToOverview();
+      });
+    } else {
+      window.pywebview.api.get_state().then(render);
+    }
+  });
+}
+
+function backToOverview() {
+  window.pywebview.api.close_project().then(render);
+}
 
 // The theme actually in effect right now: the manual override if one is set via
 // data-theme, otherwise whatever the OS reports through prefers-color-scheme.

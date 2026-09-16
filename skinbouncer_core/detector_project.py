@@ -96,10 +96,14 @@ def save_manifest(manifest, project_dir):
     _write_json(manifest_path(project_dir), manifest)
 
 
-def setup_detector_project(good_dir, bad_dir, project_dir, ratios=DEFAULT_RATIOS, seed=67):
+def setup_detector_project(good_dir, bad_dir, project_dir, ratios=DEFAULT_RATIOS, seed=67, name=None):
     """Create (or incrementally update) a detector project's split manifest. Returns
     the manifest dict. Safe to call repeatedly - see module docstring for the
-    freeze-on-first-run behavior of the test split."""
+    freeze-on-first-run behavior of the test split.
+
+    name, if given, is stored as a purely cosmetic "name" key, independent of
+    "category" (which stays auto-derived from bad_dir's folder name as always) - see
+    project_display_name()."""
     if abs(sum(ratios) - 1.0) > 1e-6:
         raise ValueError(f"ratios must sum to 1.0, got {ratios}")
 
@@ -122,6 +126,9 @@ def setup_detector_project(good_dir, bad_dir, project_dir, ratios=DEFAULT_RATIOS
             "images": {},
         }
 
+    if name is not None:
+        manifest["name"] = name
+
     images = manifest["images"]
     is_first_run = len(images) == 0
 
@@ -138,6 +145,14 @@ def setup_detector_project(good_dir, bad_dir, project_dir, ratios=DEFAULT_RATIOS
 
     _write_json(path, manifest)
     return manifest
+
+
+def project_display_name(manifest, project_dir):
+    """The label a project shows in the overview: an explicit "name" if one was set,
+    else "category" (already meaningful for every existing project), else the project
+    directory's own folder name - so a project predating the "name" field still shows
+    up without any migration."""
+    return manifest.get("name") or manifest.get("category") or Path(project_dir).name
 
 
 def get_split_filepaths(manifest, split):

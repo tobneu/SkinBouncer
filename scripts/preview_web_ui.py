@@ -31,14 +31,28 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 WEB_DIR = ROOT / "labeling_tool" / "web"
 
-SCREENS = ("labeling", "blind", "active-learning", "done")
+SCREENS = ("labeling", "blind", "active-learning", "done", "overview", "wizard")
 
 
 def _state_js(screen):
     """The get_state() payload each js_api class produces, as the frontend sees it.
     Mirrors labeling_tool/api.py - LabelingAPI sets no model-derived fields at all,
-    BlindTestReviewAPI adds recorded_class and can_skip=false, and ActiveLearningAPI
-    adds the ranking metadata plus the retrain/export panels."""
+    BlindTestReviewAPI adds recorded_class and can_skip=false, ActiveLearningAPI adds
+    the ranking metadata plus the retrain/export panels, and SkinBouncerAPI's overview
+    mode (screen == "overview") replaces all of that with a project list. "wizard" reuses
+    the same overview state - see _build_page, which drives it there via startWizard()
+    rather than through get_state(), matching how the real app never puts the wizard's
+    steps behind a get_state() payload at all (it's pure client-side navigation)."""
+    if screen in ("overview", "wizard"):
+        return {
+            "screen": "overview",
+            "projects": [
+                {"project_dir": "detector_projects/bad_demo", "display_name": "bad_demo", "trained": True},
+                {"project_dir": "detector_projects/hate_spiders_1", "display_name": "spiderman", "trained": True},
+                {"project_dir": "detector_projects/new_one", "display_name": "new_one", "trained": False},
+            ],
+        }
+
     base = {
         "done": False, "index": 12, "total": 40, "remaining": 28,
         "filename": "example.png",
@@ -86,6 +100,9 @@ def _build_page(screen, skin_path, saved_theme=None):
         state["image_data_uri"] = f"data:image/png;base64,{encoded}"
         state["filename"] = Path(skin_path).name
 
+    # Fixed fake responses, same spirit as export_detector below - enough to click
+    # through the overview/wizard screens and see them render, not a stateful
+    # simulation of a real training run (that's what the pytest suite is for).
     stub = f"""<script>
 const STATE = {json.dumps(state)};
 window.__errors = [];
@@ -100,8 +117,18 @@ window.pywebview = {{api: {{
   set_theme: (theme) => Promise.resolve({{status: "ok"}}),
   export_detector: () => Promise.resolve({{category: "demo", threshold: 0.5,
                                            dest_dir: "api/models/detectors/demo"}}),
+  pick_folder: () => Promise.resolve({{path: "/tmp/fake-folder"}}),
+  create_project: (name, good, bad) => Promise.resolve({{status: "started"}}),
+  open_project: (projectDir) => Promise.resolve({{status: "ok"}}),
+  close_project: () => Promise.resolve(STATE),
 }}}};
-window.addEventListener("load", () => window.dispatchEvent(new Event("pywebviewready")));
+window.addEventListener("load", () => {{
+  window.dispatchEvent(new Event("pywebviewready"));
+  // Queued as a macrotask, so it runs after pywebviewready's own get_state().then(render)
+  // microtask chain has settled - otherwise render()'s showScreen("overview") (from the
+  // initial state) can resolve after startWizard()'s showScreen("wizard") and stomp it.
+  {"setTimeout(() => window.startWizard(), 0);" if screen == "wizard" else ""}
+}});
 </script>
 """
     index = work / "web" / "index.html"
